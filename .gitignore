@@ -1,5 +1,8 @@
 .idea/
 
+logs/
+cache/
+
 
 ### Python ###
 # Byte-compiled / optimized / DLL files

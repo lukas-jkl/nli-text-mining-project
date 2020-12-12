@@ -1,22 +1,33 @@
+import data
+import models.random_guessing
+import models.feature_based
+import models.sentence_vector
+import tensorflow as tf
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
+
+def main():
+    labeled_data, unlabeled_data = data.load_data()
+    train, test = get_english_labled_data(labeled_data)
+
+    # Run dummy classifier
+    # models.random_guessing.run_dummy_model(train, test)
+    # models.feature_based.run_manual_feature_model(train, test)
+    # models.feature_based.pretrain_word_embedding_model()
+    # models.feature_based.run_word_embedding_model(train, test)
+    models.sentence_vector.run_LSTM_model(train, test)
+    #models.sentence_vector.pretrain_LSTM_model()
+    print("done")
 
 
-def load_data():
-    training_data = pd.read_csv('data/train.csv')
-    unlabeled_test_data = pd.read_csv('data/test.csv')
-    return training_data, unlabeled_test_data
 
-
-def explore_data(data, name):
-    data[['language', 'label']].groupby(by='label')['language'].value_counts().unstack(0).plot(kind='bar')
-    plt.title(name)
-    plt.xlabel('Language')
-    plt.ylabel('Number of samples')
-    plt.show()
+def get_english_labled_data(data):
+    english_data = data[data.lang_abv == "en"]
+    train, test = \
+        np.split(english_data.sample(frac=1, random_state=42),
+                 [int(.85 * len(english_data))])
+    return train, test
 
 
 if __name__ == '__main__':
-    data, unlabeled_data = load_data()
-    explore_data(data, 'Data')
+    main()

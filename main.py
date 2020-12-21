@@ -4,7 +4,6 @@ import models.feature_based
 import models.sentence_vector
 import tensorflow as tf
 import numpy as np
-import pandas as pd
 
 def main():
     labeled_data, unlabeled_data = data.load_data()
@@ -15,8 +14,8 @@ def main():
     # models.feature_based.run_manual_feature_model(train, test)
     # models.feature_based.pretrain_word_embedding_model()
     # models.feature_based.run_word_embedding_model(train, test)
-    models.sentence_vector.run_LSTM_model(train, test)
-    #models.sentence_vector.pretrain_LSTM_model()
+    # models.sentence_vector.run_LSTM_model(train, test)
+    models.sentence_vector.pretrain_LSTM_model()
     print("done")
 
 

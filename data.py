@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -42,9 +44,15 @@ def get_word_features(docs):
 
 
 def calculate_embeddings_and_pos_tag(data, cache_file):
+    root, ext = os.path.splitext(cache_file)
     try:
-        features = pd.read_pickle(cache_file)
-    except:
+        if ext == ".pkl":
+            features = pd.read_pickle(cache_file)
+        elif ext == ".feather":
+            features = pd.read_feather(cache_file)
+        else:
+            raise NotImplementedError()
+    except FileNotFoundError:
         nlp = spacy.load('en_core_web_lg')
 
         premises = [nlp(sentence) for sentence in data["premise"]]
@@ -61,7 +69,12 @@ def calculate_embeddings_and_pos_tag(data, cache_file):
             'hypothesis_word_vectors': hypothesis_word_vectors,
             'label': data["label"].values
         })
-        features.to_pickle(cache_file)
+        if ext == ".pkl":
+            features.to_pickle(cache_file)
+        elif ext == ".feather":
+            features.reset_index().to_feather(cache_file)
+        else:
+            raise NotImplementedError()
     return features
 
 def test_training_calculate_embeddings_and_pos_tags(test, train):

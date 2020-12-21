@@ -174,17 +174,40 @@ def pretrain_LSTM_model():
     ]
     Y_train = tf.one_hot(pretrain_data.label.values, 3)
 
+    # Callbacks
     title = "try1"
     log_directory = "logs/lstm_classifier/training/" + title + "/"
+    tensorboard_log_dir = log_directory + "tensorboard_logs/"
     pathlib.Path(log_directory).mkdir(parents=True, exist_ok=True)
-    model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
+    hist_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=tensorboard_log_dir,
+        histogram_freq=1,
+        write_images=False,
+        write_graph=True)
+
+    # Create a callback that saves the model's weights every 5 epochs
+    batch_size = 128
+    checkpoint_log_dir = log_directory + "model_checkpoints/"
+    cp_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_log_dir,
+        verbose=1,
+        save_weights_only=True,
+        save_freq=5 * batch_size)
 
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=20, restore_best_weights=True
+        monitor='val_loss', patience=5, restore_best_weights=True
     )
 
-    model.fit(X_train, Y_train, epochs=100, validation_split=0.2, callbacks=[early_stopping], batch_size=128)
-    print("done")
+    model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
+    model.fit(X_train, Y_train,
+              epochs=100,
+              validation_split=0.2,
+              callbacks=[early_stopping, hist_callback, cp_callback],
+              batch_size=128)
+
+    final_weights_path = log_directory + "final_weights/weights"
+    model.save_weights(final_weights_path)
+    print("pretraining done, final weights stored to: ", final_weights_path)
 
 
 def run_LSTM_model(train, test, load_weighs_from_pretraining=False):
@@ -193,17 +216,6 @@ def run_LSTM_model(train, test, load_weighs_from_pretraining=False):
     embedding_weights = glove_vectors.vectors
 
     print("done")
-    # X_train = [
-    #    tf.constant(train.hypothesis.values),
-    #    tf.constant(train.premise.values)
-    # ]
-    # Y_train = torch.tensor(train.label.values)
-    #
-    # X_test = [
-    #    tf.constant(test.hypothesis.values),
-    #    tf.constant(test.premise.values)
-    # ]
-    # Y_test = torch.tensor(test.label.values)
     test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train)
     max_length_test = max([max([len(a) for a in test_feature_data.premises_words]),
                            max([len(b) for b in test_feature_data.hypothesis_words])])
@@ -228,10 +240,10 @@ def run_LSTM_model(train, test, load_weighs_from_pretraining=False):
     pathlib.Path(log_directory).mkdir(parents=True, exist_ok=True)
     model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
     if load_weighs_from_pretraining:
-        model.load_weights("logs/embedded_classifier/pretraining/try1/final_weights/weights")
+        model.load_weights("logs/lstm_classifier/pretraining/try1/final_weights/weights")
 
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=20, restore_best_weights=True
+        monitor='val_loss', patience=5, restore_best_weights=True
     )
 
     model.fit(X_train, Y_train, epochs=100, validation_split=0.2, callbacks=[early_stopping], batch_size=128)

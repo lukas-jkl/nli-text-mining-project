@@ -247,7 +247,7 @@ def hyperparameter_search(X_train, Y_train):
     hist_callback = tf.keras.callbacks.TensorBoard(
         log_dir=tensorboard_log_dir,
         histogram_freq=1,
-        write_images=True,
+        write_images=False,
         write_graph=True)
     stop_callback = tf.keras.callbacks.EarlyStopping(
         monitor='val_accuracy', patience=3)

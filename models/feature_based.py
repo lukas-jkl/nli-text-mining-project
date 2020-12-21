@@ -15,7 +15,7 @@ from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
 
 from data import calculate_embeddings_and_pos_tag, test_training_calculate_embeddings_and_pos_tags
-from models.util import custom_plot_confusion_matrix, get_pretrain_data
+from models.util import custom_plot_confusion_matrix, get_pretrain_data, evaluate_model
 
 
 class CrossUnigramsTransformer(BaseEstimator, TransformerMixin):
@@ -218,16 +218,7 @@ def run_word_embedding_model(train, test, load_weighs_from_pretraining=False):
     )
 
     model.fit(X_train, Y_train, epochs=100, validation_split=0.2, callbacks=[early_stopping])
-    print(model.evaluate(X_test, Y_test))
-    Y_pred = model.predict(X_test)
-    cnf_matrix = confusion_matrix(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1))
-    plt.figure()
-    custom_plot_confusion_matrix(cnf_matrix, classes=[0, 1, 2],
-                                 title='Confusion matrix')
-
-    plt.show()
-    print(classification_report(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1)))
-    print("done")
+    evaluate_model(model, X_test, Y_test)
 
 
 def hyperparameter_search(X_train, Y_train):

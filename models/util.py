@@ -2,7 +2,10 @@ import matplotlib.pyplot as plt
 import itertools
 import numpy as np
 import pandas as pd
+from sklearn.metrics import confusion_matrix, classification_report
 
+
+# https://towardsdatascience.com/demystifying-confusion-matrix-confusion-9e82201592fd
 def custom_plot_confusion_matrix(cm, classes,
                                  normalize=False,
                                  title='Confusion matrix',
@@ -38,7 +41,6 @@ def custom_plot_confusion_matrix(cm, classes,
     plt.xlabel('Predicted label')
 
 
-
 def get_pretrain_data(number_samples=100000):
     # Prepare data
     pretrain_data = pd.read_json('./data/pretrain/snli_1.0_train.jsonl', lines=True)
@@ -53,3 +55,12 @@ def get_pretrain_data(number_samples=100000):
     return pretrain_data
 
 
+def evaluate_model(model, X_test, Y_test):
+    print(model.evaluate(X_test, Y_test))
+    Y_pred = model.predict(X_test)
+    cnf_matrix = confusion_matrix(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1))
+    plt.figure()
+    custom_plot_confusion_matrix(cnf_matrix, classes=[0, 1, 2],
+                                 title='Confusion matrix')
+    plt.show()
+    print(classification_report(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1)))

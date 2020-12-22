@@ -153,7 +153,7 @@ def get_prepared_embeddings_model(log_dir):
 
 def pretrain_word_embedding_model():
     pretrain_data = get_pretrain_data()
-    pretrain_feature_data = calculate_embeddings_and_pos_tag(pretrain_data, './cache/pretrain_features.pkl')
+    pretrain_feature_data = calculate_embeddings_and_pos_tag(pretrain_data, './cache/pretrain_features.feather')
     hypothesis_embeddings_training, premises_embeddings_training = sum_embeddings(pretrain_feature_data)
 
     X_train = [np.array(hypothesis_embeddings_training), np.array(premises_embeddings_training)]

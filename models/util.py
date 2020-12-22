@@ -1,7 +1,10 @@
+import pathlib
+
 import matplotlib.pyplot as plt
 import itertools
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 from sklearn.metrics import confusion_matrix, classification_report
 
 
@@ -64,3 +67,25 @@ def evaluate_model(model, X_test, Y_test):
                                  title='Confusion matrix')
     plt.show()
     print(classification_report(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1)))
+
+
+def prepare_log_callbacks(batch_size, log_directory):
+    tensorboard_log_dir = log_directory + "tensorboard_logs/"
+
+    pathlib.Path(log_directory).mkdir(parents=True, exist_ok=True)
+    hist_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=tensorboard_log_dir,
+        histogram_freq=1,
+        write_images=False,
+        write_graph=True)
+
+    checkpoint_log_dir = log_directory + "model_checkpoints/"
+    cp_callback = tf.keras.callbacks.ModelCheckpoint(
+        filepath=checkpoint_log_dir,
+        verbose=1,
+        monitor="val_loss",
+        save_weights_only=False,
+        save_best_only=True,
+        save_freq=5 * batch_size)
+
+    return hist_callback, cp_callback

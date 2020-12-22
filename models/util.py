@@ -83,7 +83,7 @@ def prepare_log_callbacks(batch_size, log_directory):
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_log_dir,
         verbose=1,
-        monitor="val_loss",
+        monitor="accuracy",
         save_weights_only=False,
         save_best_only=True,
         save_freq=5 * batch_size)

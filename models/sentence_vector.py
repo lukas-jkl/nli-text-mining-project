@@ -20,18 +20,11 @@ class LSTMClassifier(HyperModel):
         self.sentence_length = sentence_length
 
     def build(self, hp):
-        # word2vec_embeddings = hub.KerasLayer("./downloaded_models/word2vec250",
-        #                                            trainable=False, dtype=tf.string)
-
-        # seq_mod = tf.keras.Sequential([
-        #     word2vec_embeddings,
-        #     tf.keras.layers.LSTM(128),
-        #     tf.keras.layers.Dense(4)
-        # ])
-
-        # model = hub.load("./downloaded_models/word2vec250")
-
         lstm_units = hp.Choice("lstm_units", [32, 64, 128])
+        lstm_dropout = hp.Choice("lstm_dropout", [0, 0.01, 0.05, 0.1])
+        concat_hidden_neurons = hp.Choice("concat_hidden_layer_neurons", [32, 64, 128])
+        concat_hidden_layers = hp.Choice("concat_hidden_layer_num_layers", [1, 2, 3])
+
         layer_hypothesis = input_hypothesis = tf.keras.Input(dtype=tf.int32, shape=(self.sentence_length,),
                                                              name="hypothesis_input_layer")
         layer_premises = input_premises = tf.keras.Input(dtype=tf.int32, shape=(self.sentence_length,),
@@ -57,14 +50,14 @@ class LSTMClassifier(HyperModel):
         layer_premises = embedding_layer_premises(layer_premises)
         concat = tf.keras.layers.concatenate([layer_premises, layer_hypothesis], axis=1, name="concatenation_layer")
 
-        concat_hidden_neurons = hp.Choice("concat_hidden_layer_neurons", [32, 64, 128])
-        concat_hidden_layers = hp.Choice("concat_hidden_layer_num_layers", [1, 2, 3])
         concat_hidden_layers = [concat_hidden_neurons] * concat_hidden_layers
         for i, neurons in enumerate(concat_hidden_layers):
             concat = tf.keras.layers.Dense(concat_hidden_neurons, activation='relu',
                                            name="concat_dense_hidden_layer_" + str(i))(concat)
 
-        concat = tf.keras.layers.LSTM(lstm_units)(concat)
+        concat = tf.keras.layers.LSTM(lstm_units,
+                                      activation='tanh',
+                                      dropout=lstm_dropout)(concat)
 
         final_dense_neurons = self.output_size
         output = tf.keras.layers.Dense(final_dense_neurons, activation='softmax',
@@ -89,6 +82,7 @@ def get_prepared_LSTM_model(embedding_weights, log_dir, max_len):
     hp = kt.HyperParameters()
     parameters = [
         hp.Fixed("lstm_units", 64),
+        hp.Fixed("lstm_dropout", 0.05),
         hp.Fixed("concat_hidden_layer_num_layers", 2),
         hp.Fixed("concat_hidden_layer_neurons", 128),
     ]

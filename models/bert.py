@@ -47,7 +47,7 @@ def get_bert_base_model(model_name, max_len, log_directory):
     model = tf.keras.Model(
         inputs=[input_word_ids, input_mask, input_type_ids],
         outputs=[output])
-    model.compile('adam', loss='categorical_crossentropy', metrics=['accuracy', 'val_loss'])
+    model.compile('adam', loss='categorical_crossentropy', metrics=['accuracy'])
     model.summary()
 
     tf.keras.utils.plot_model(
@@ -74,19 +74,20 @@ def pretrain_bert_base_model(model_name='bert-base-uncased', title=None, restore
     log_directory = get_log_directory(model_name, title, True)
     model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory)
     model = train_model(X_train, Y_train,
-                                     model=model,
-                                     log_directory=log_directory,
-                                     batch_size=batch_size,
-                                     epochs=100,
-                                     additional_callbacks=[early_stopping],
-                                     restore_checkpoint=restore_checkpoint)
+                        model=model,
+                        log_directory=log_directory,
+                        batch_size=batch_size,
+                        epochs=100,
+                        additional_callbacks=[early_stopping],
+                        restore_checkpoint=restore_checkpoint)
 
     final_weights_path = save_final_weights(model, log_directory)
     print("done")
     return final_weights_path
 
 
-def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
+def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None, restore_checkpoint=False,
+                        load_weights_from_pretraining=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
     tokenizer = BertTokenizer.from_pretrained(model_name)
@@ -117,11 +118,11 @@ def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None,
         model.load_weights(pretrain_log_directory)
 
     model = train_model(X_train, Y_train,
-                                     model=model,
-                                     log_directory=log_directory,
-                                     batch_size=batch_size,
-                                     epochs=100,
-                                     additional_callbacks=[early_stopping],
-                                     restore_checkpoint=restore_checkpoint)
+                        model=model,
+                        log_directory=log_directory,
+                        batch_size=batch_size,
+                        epochs=100,
+                        additional_callbacks=[early_stopping],
+                        restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)
     print("done")

@@ -1,7 +1,7 @@
 import pathlib
 
 import matplotlib.pyplot as plt
-import itertools
+import itertools, json
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -103,12 +103,14 @@ def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
         model.load_weights(cp_callback.filepath)
         print("done")
 
-    model.fit(X_train, Y_train,
+    history = model.fit(X_train, Y_train,
               epochs=epochs,
               verbose=1,
               validation_split=0.2,
               callbacks=callbacks,
               batch_size=batch_size)
+    with open(log_directory + "history.txt", "w") as f:
+        f.write(json.dumps(history.history))
     return model, log_directory
 
 
@@ -123,7 +125,7 @@ def prepare_log_callbacks(batch_size, log_directory):
         write_graph=True,
         profile_batch=2)
 
-    checkpoint_log_dir = log_directory + "model_checkpoints/epoch_{epoch:02d}"
+    checkpoint_log_dir = log_directory + "model_checkpoints/"
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_log_dir,
         verbose=1,

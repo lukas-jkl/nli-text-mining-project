@@ -37,7 +37,7 @@ def prepare_bert_input(data, tokenizer):
         [type_cls, type_hypothesis, type_premise], axis=-1).to_tensor()
 
     inputs = {
-        'input_word_ids': input_ids,
+        'input_word_ids': input_ids.to_tensor(),
         'input_mask': input_mask,
         'input_type_ids': input_type_ids
     }
@@ -47,12 +47,12 @@ def prepare_bert_input(data, tokenizer):
 def get_bert_base_model(model_name, log_dir):
     bert_model = TFBertModel.from_pretrained(model_name)
     max_len = 111
-    input_word_ids = tf.keras.Input(shape=(max_len,) , dtype=tf.int32, name="input_word_ids")
-    input_mask = tf.keras.Input(shape=(max_len,) , dtype=tf.int32, name="input_mask")
-    input_type_ids = tf.keras.Input(shape=(max_len,) , dtype=tf.int32, name="input_type_ids")
+    input_word_ids = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_word_ids")
+    input_mask = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_mask")
+    input_type_ids = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_type_ids")
 
     bert = bert_model([input_word_ids, input_mask, input_type_ids])[0]
-    output = tf.keras.layers.Dense(3, activation='softmax')(bert[:,0,:])
+    output = tf.keras.layers.Dense(3, activation='softmax')(bert[:, 0, :])
 
     model = tf.keras.Model(
         inputs=[input_word_ids, input_mask, input_type_ids],
@@ -72,20 +72,18 @@ def run_bert_base_model(train, test):
     model_name = 'bert-base-uncased'
     tokenizer = BertTokenizer.from_pretrained(model_name)
 
-    X_train = prepare_bert_input(train, tokenizer)
+    test = test.assign(test=True)
+    train = train.assign(test=False)
+    data = train.append(test)
+    X = prepare_bert_input(data, tokenizer)
+
+    X_train, X_test = dict(), dict()
+    for key in X.keys():
+        X_train[key] = X[key][data.test.values == False]
+        X_test[key] = X[key][data.test.values == True]
+
     Y_train = tf.one_hot(train.label.values, 3, axis=1)
-
-    X_test = prepare_bert_input(test, tokenizer)
     Y_test = tf.one_hot(test.label.values, 3, axis=1)
-
-    max_length = max([
-        max([a.shape[0] for a in X_train['input_word_ids']]),
-        max([a.shape[0] for a in X_test['input_word_ids']])
-    ])
-
-    # pad to same length
-    X_train['input_word_ids'] = X_train['input_word_ids'].to_tensor(default_value=0, shape=[None, max_length])
-    X_test['input_word_ids'] = X_test['input_word_ids'].to_tensor(default_value=0, shape=[None, max_length])
 
     # Callbacks
     title = "try1"
@@ -99,7 +97,7 @@ def run_bert_base_model(train, test):
         write_graph=True)
 
     # Create a callback that saves the model's weights every 5 epochs
-    batch_size = 128
+    batch_size = 32
     checkpoint_log_dir = log_directory + "model_checkpoints/"
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_log_dir,
@@ -108,12 +106,12 @@ def run_bert_base_model(train, test):
         save_freq=5 * batch_size)
 
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=5, restore_best_weights=True
+        monitor='val_loss', patience=7, restore_best_weights=True
     )
 
     model = get_bert_base_model(model_name, log_directory)
     model.fit(x=X_train, y=Y_train,
-              epochs=10,
+              epochs=50,
               verbose=1,
               validation_split=0.2,
               callbacks=[early_stopping, hist_callback, cp_callback],

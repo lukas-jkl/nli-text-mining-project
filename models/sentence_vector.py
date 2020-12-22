@@ -21,7 +21,7 @@ class LSTMClassifier(HyperModel):
 
     def build(self, hp):
         lstm_units = hp.Choice("lstm_units", [32, 64, 128])
-        lstm_dropout = hp.Choice("lstm_dropout", [0, 0.01, 0.05, 0.1])
+        lstm_dropout = hp.Choice("lstm_dropout", [0.0, 0.01, 0.05, 0.1])
         concat_hidden_neurons = hp.Choice("concat_hidden_layer_neurons", [32, 64, 128])
         concat_hidden_layers = hp.Choice("concat_hidden_layer_num_layers", [1, 2, 3])
 
@@ -120,29 +120,6 @@ def encode_strings_with_dict(data, vocab, maxlen):
     print(num_out_of_vocab, "/", num_in_vocab, " words out of vocabulary")
     return tf.keras.preprocessing.sequence.pad_sequences(stentences_indices,
                                                          padding='post', value=0, maxlen=maxlen)
-
-
-def download_embeddings():
-    EMBEDDING_DIMENSION = 200  # Available dimensions for 6B data is 50, 100, 200, 300
-    data_directory = './downloaded_models/glove'
-
-    if not os.path.isdir(data_directory):
-        pathlib.Path(data_directory).mkdir(parents=True, exist_ok=True)
-
-    glove_weights_file_path = os.path.join(data_directory, f'glove.6B.{EMBEDDING_DIMENSION}d.txt')
-
-    if not os.path.isfile(glove_weights_file_path):
-        # Glove embedding weights can be downloaded from https://nlp.stanford.edu/projects/glove/
-        glove_fallback_url = 'http://nlp.stanford.edu/data/glove.6B.zip'
-        local_zip_file_path = os.path.join(data_directory, os.path.basename(glove_fallback_url))
-        if not os.path.isfile(local_zip_file_path):
-            print(f'Retreiving glove weights from {glove_fallback_url}')
-            wget.download(glove_fallback_url, local_zip_file_path)
-        with zipfile.ZipFile(local_zip_file_path, 'r') as z:
-            print(f'Extracting glove weights from {local_zip_file_path}')
-            z.extractall(path=data_directory)
-
-    print("done")
 
 
 def pretrain_LSTM_model(title="try1", restore_checkpoint=False):

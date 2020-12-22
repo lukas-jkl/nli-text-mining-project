@@ -171,7 +171,7 @@ def pretrain_word_embedding_model():
         write_graph=True)
 
     # Create a callback that saves the model's weights every 5 epochs
-    batch_size = 128
+    batch_size = 64
     checkpoint_log_dir = log_directory + "model_checkpoints/"
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_log_dir,

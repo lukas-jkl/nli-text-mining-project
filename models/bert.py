@@ -54,7 +54,7 @@ def get_bert_base_model(model_name, max_len):
     model.summary()
 
     tf.keras.utils.plot_model(
-        model, to_file="logs/" + model_name + "/model", show_shapes=False, show_layer_names=True,
+        model, to_file="logs/" + model_name + "/bert_model.png", show_shapes=False, show_layer_names=True,
         rankdir='TB', expand_nested=False, dpi=96
     )
 

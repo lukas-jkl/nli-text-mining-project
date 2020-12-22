@@ -1,10 +1,7 @@
-import pathlib
+import time
 
-from sklearn.metrics import confusion_matrix, classification_report
 from transformers import BertTokenizer, TFBertModel
-import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
+
 from models.util import *
 
 
@@ -38,7 +35,7 @@ def prepare_bert_input(data, tokenizer):
     return inputs
 
 
-def get_bert_base_model(model_name, max_len):
+def get_bert_base_model(model_name, max_len, log_directory):
     bert_model = TFBertModel.from_pretrained(model_name)
     input_word_ids = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_word_ids")
     input_mask = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_mask")
@@ -50,54 +47,48 @@ def get_bert_base_model(model_name, max_len):
     model = tf.keras.Model(
         inputs=[input_word_ids, input_mask, input_type_ids],
         outputs=[output])
-    model.compile('adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile('adam', loss='categorical_crossentropy', metrics=['accuracy', 'val_loss'])
     model.summary()
 
     tf.keras.utils.plot_model(
-        model, to_file="logs/" + model_name + "/bert_model.png", show_shapes=False, show_layer_names=True,
+        model, to_file=log_directory + "/bert_model.png", show_shapes=False, show_layer_names=True,
         rankdir='TB', expand_nested=False, dpi=96
     )
 
     return model
 
 
-def pretrain_bert_base_model(model_name='bert-base-uncased', title="try1", restore_checkpoint=False):
+def pretrain_bert_base_model(model_name='bert-base-uncased', title=None, restore_checkpoint=False):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
+
     pretrain_data = get_pretrain_data()
     tokenizer = BertTokenizer.from_pretrained(model_name)
     X_train = prepare_bert_input(pretrain_data, tokenizer)
     Y_train = tf.one_hot(pretrain_data.label.values, 3, axis=1)
 
-    # Callbacks
-    log_directory = "logs/" + model_name + "/pretraining/" + title + "/"
     batch_size = 32
-    hist_callback, cp_callback = prepare_log_callbacks(batch_size, log_directory)
-
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=7, restore_best_weights=True
     )
-    callbacks = [hist_callback, cp_callback, early_stopping]
+    log_directory = get_log_directory(model_name, title, True)
+    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory)
+    model = train_model(X_train, Y_train,
+                                     model=model,
+                                     log_directory=log_directory,
+                                     batch_size=batch_size,
+                                     epochs=100,
+                                     additional_callbacks=[early_stopping],
+                                     restore_checkpoint=restore_checkpoint)
 
-    if restore_checkpoint:
-        model = tf.keras.models.load_model(cp_callback.filepath)
-    else:
-        model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1])
-
-    model.fit(x=X_train, y=Y_train,
-              epochs=50,
-              verbose=1,
-              validation_split=0.2,
-              callbacks=callbacks,
-              batch_size=batch_size,
-              )
-
-    final_weights_path = log_directory + "final_weights/weights"
-    model.save_weights(final_weights_path)
-    print("pretraining done, final weights stored to: ", final_weights_path)
+    final_weights_path = save_final_weights(model, log_directory)
     print("done")
     return final_weights_path
 
 
-def run_bert_base_model(train, test, model_name='bert-base-uncased', title="try1", restore_checkpoint=False, load_weighs_from_pretraining=False):
+def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
     tokenizer = BertTokenizer.from_pretrained(model_name)
 
     test = test.assign(test=True)
@@ -113,31 +104,24 @@ def run_bert_base_model(train, test, model_name='bert-base-uncased', title="try1
     Y_train = tf.one_hot(train.label.values, 3, axis=1)
     Y_test = tf.one_hot(test.label.values, 3, axis=1)
 
-    # Callbacks
-    log_directory = "logs/" + model_name + "/training/" + title + "/"
     batch_size = 32
-    hist_callback, cp_callback = prepare_log_callbacks(batch_size, log_directory)
-
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=7, restore_best_weights=True
     )
-    callbacks = [hist_callback, cp_callback, early_stopping]
 
-    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1])
+    log_directory = get_log_directory(model_name, title)
+    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory)
 
-    if restore_checkpoint:
-        model = tf.keras.models.load_model(cp_callback.filepath)
-    if load_weighs_from_pretraining:
-        pretrain_log_directory = "logs/" + model_name + "/pretraining/" + title + "/" + "final_weights/weights"
+    if load_weights_from_pretraining:
+        pretrain_log_directory = get_log_directory(model_name, title, True)
         model.load_weights(pretrain_log_directory)
 
-    model.fit(x=X_train, y=Y_train,
-              epochs=50,
-              verbose=1,
-              validation_split=0.2,
-              callbacks=callbacks,
-              batch_size=batch_size,
-              )
-
-    evaluate_model(model, X_test, Y_test)
+    model = train_model(X_train, Y_train,
+                                     model=model,
+                                     log_directory=log_directory,
+                                     batch_size=batch_size,
+                                     epochs=100,
+                                     additional_callbacks=[early_stopping],
+                                     restore_checkpoint=restore_checkpoint)
+    evaluate_model(model, X_test, Y_test, log_directory)
     print("done")

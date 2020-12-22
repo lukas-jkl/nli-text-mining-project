@@ -1,4 +1,5 @@
 import os
+import time
 import zipfile
 
 import gensim
@@ -122,7 +123,10 @@ def encode_strings_with_dict(data, vocab, maxlen):
                                                          padding='post', value=0, maxlen=maxlen)
 
 
-def pretrain_LSTM_model(title="try1", restore_checkpoint=False):
+def pretrain_LSTM_model(title=None, restore_checkpoint=False):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
+
     # Prepare data
     pretrain_data = get_pretrain_data()
 
@@ -131,8 +135,10 @@ def pretrain_LSTM_model(title="try1", restore_checkpoint=False):
     max_length = max([max([len(a) for a in pretrain_feature_data.premises_words]),
                       max([len(b) for b in pretrain_feature_data.hypothesis_words])])
 
+    print("loading embedding vectors")
     glove_vectors = gensim.downloader.load('glove-twitter-100')
     embedding_weights = glove_vectors.vectors
+    print("done")
 
     X_train = [
         encode_strings_with_dict(pretrain_feature_data.hypothesis_words.values, glove_vectors.vocab, max_length),
@@ -140,40 +146,35 @@ def pretrain_LSTM_model(title="try1", restore_checkpoint=False):
     ]
     Y_train = tf.one_hot(pretrain_data.label.values, 3)
 
-    # Callbacks
     model_name = "lstm_classifier"
-    log_directory = "logs/" + model_name + "/pretraining/" + title + "/"
     batch_size = 64
-    hist_callback, cp_callback = prepare_log_callbacks(batch_size, log_directory)
-
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=5, restore_best_weights=True
     )
-    callbacks = [hist_callback, cp_callback, early_stopping]
+    log_directory = get_log_directory(model_name, title, True)
+    model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
+    model = train_model(X_train, Y_train,
+                                     model=model,
+                                     log_directory=log_directory,
+                                     batch_size=batch_size,
+                                     epochs=100,
+                                     additional_callbacks=[early_stopping],
+                                     restore_checkpoint=restore_checkpoint)
 
-    if restore_checkpoint:
-        model = tf.keras.models.load_model(cp_callback.filepath)
-    else:
-        model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
-    model.fit(X_train, Y_train,
-              epochs=100,
-              validation_split=0.2,
-              callbacks=callbacks,
-              batch_size=128)
-
-    final_weights_path = log_directory + "final_weights/weights"
-    model.save_weights(final_weights_path)
-    print("pretraining done, final weights stored to: ", final_weights_path)
+    final_weights_path = save_final_weights(model, log_directory)
     print("done")
     return final_weights_path
 
 
-def run_LSTM_model(train, test, title="try1", restore_checkpoint=False, load_weighs_from_pretraining=False):
-    # download_embeddings()
+def run_LSTM_model(train, test, title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
+
+    print("loading embedding vectors")
     glove_vectors = gensim.downloader.load('glove-twitter-100')
     embedding_weights = glove_vectors.vectors
-
     print("done")
+
     test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train)
     max_length_test = max([max([len(a) for a in test_feature_data.premises_words]),
                            max([len(b) for b in test_feature_data.hypothesis_words])])
@@ -193,30 +194,24 @@ def run_LSTM_model(train, test, title="try1", restore_checkpoint=False, load_wei
     ]
     Y_test = tf.one_hot(test.label.values, 3)
 
-    # Callbacks
+    batch_size = 32
     model_name = "lstm_classifier"
-    log_directory = "logs/" + model_name + "/training/" + title + "/"
-    batch_size = 64
-    hist_callback, cp_callback = prepare_log_callbacks(batch_size, log_directory)
-
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=5, restore_best_weights=True
     )
-    callbacks = [hist_callback, cp_callback, early_stopping]
-
+    log_directory = get_log_directory(model_name, title)
     model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
 
-    if restore_checkpoint:
-        model = tf.keras.models.load_model(cp_callback.filepath)
-    if load_weighs_from_pretraining:
-        pretrain_log_directory = "logs/" + model_name + "/pretraining/" + title + "/" + "final_weights/weights"
+    if load_weights_from_pretraining:
+        pretrain_log_directory = get_log_directory(model_name, title, True)
         model.load_weights(pretrain_log_directory)
 
-    model.fit(X_train, Y_train,
-              epochs=100,
-              verbose=1,
-              validation_split=0.2,
-              callbacks=callbacks,
-              batch_size=128)
-    evaluate_model(model, X_test, Y_test)
+    model = train_model(X_train, Y_train,
+                                     model=model,
+                                     log_directory=log_directory,
+                                     batch_size=batch_size,
+                                     epochs=100,
+                                     additional_callbacks=[early_stopping],
+                                     restore_checkpoint=restore_checkpoint)
+    evaluate_model(model, X_test, Y_test, log_directory)
     print("done")

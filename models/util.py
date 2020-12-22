@@ -58,15 +58,58 @@ def get_pretrain_data(number_samples=100000):
     return pretrain_data
 
 
-def evaluate_model(model, X_test, Y_test):
+def evaluate_model(model, X_test, Y_test, log_dir):
+    log_dir += "/final_model/"
+
     print(model.evaluate(X_test, Y_test))
+    tf.keras.models.save_model(model, log_dir + "final_model")
     Y_pred = model.predict(X_test)
     cnf_matrix = confusion_matrix(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1))
     plt.figure()
     custom_plot_confusion_matrix(cnf_matrix, classes=[0, 1, 2],
                                  title='Confusion matrix')
+    plt.savefig(log_dir + "/confusion_matrix.png")
     plt.show()
-    print(classification_report(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1)))
+    class_report = classification_report(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1))
+    with open(log_dir + '/classification_report.txt', 'w') as file:
+        file.write(class_report)
+    print(class_report)
+
+
+def get_log_directory(model_name, title, pretraining=False):
+    if pretraining:
+        train_type = "pretraining"
+    else:
+        train_type = "training"
+    log_dir = "logs/" + model_name + "/" + train_type + "/" + title + "/"
+    pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True)
+    return log_dir
+
+
+def save_final_weights(model, log_directory):
+    final_weights_path = log_directory + "final_weights/weights"
+    model.save_weights(final_weights_path)
+    print("pretraining done, final weights stored to: ", final_weights_path)
+    return final_weights_path
+
+
+def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
+                additional_callbacks, restore_checkpoint):
+    hist_callback, cp_callback = prepare_log_callbacks(batch_size, log_directory)
+    callbacks = additional_callbacks + [hist_callback, cp_callback]
+
+    if restore_checkpoint:
+        print("restoring weights from checkpoint: ", cp_callback.filepath)
+        model.load_weights(cp_callback.filepath)
+        print("done")
+
+    model.fit(X_train, Y_train,
+              epochs=epochs,
+              verbose=1,
+              validation_split=0.2,
+              callbacks=callbacks,
+              batch_size=batch_size)
+    return model, log_directory
 
 
 def prepare_log_callbacks(batch_size, log_directory):
@@ -77,15 +120,16 @@ def prepare_log_callbacks(batch_size, log_directory):
         log_dir=tensorboard_log_dir,
         histogram_freq=1,
         write_images=False,
-        write_graph=True)
+        write_graph=True,
+        profile_batch=2)
 
-    checkpoint_log_dir = log_directory + "model_checkpoints/"
+    checkpoint_log_dir = log_directory + "model_checkpoints/epoch_{epoch:02d}"
     cp_callback = tf.keras.callbacks.ModelCheckpoint(
         filepath=checkpoint_log_dir,
         verbose=1,
         monitor="accuracy",
-        save_weights_only=False,
+        save_weights_only=True,
         save_best_only=True,
-        save_freq=5 * batch_size)
+        save_freq='epoch')
 
     return hist_callback, cp_callback

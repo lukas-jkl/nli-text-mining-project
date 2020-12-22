@@ -1,21 +1,19 @@
-import pathlib
+import time
 
 import kerastuner as kt
-import matplotlib.pyplot as plt
-import numpy as np
-import pandas as pd
-import tensorflow as tf
 from kerastuner import HyperModel
 from sklearn.base import BaseEstimator, TransformerMixin
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import classification_report, confusion_matrix, plot_confusion_matrix
+from sklearn.metrics import plot_confusion_matrix
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
+from datetime import datetime
+
 
 from data import calculate_embeddings_and_pos_tag, test_training_calculate_embeddings_and_pos_tags
-from models.util import custom_plot_confusion_matrix, get_pretrain_data, evaluate_model
+from models.util import *
 
 
 class CrossUnigramsTransformer(BaseEstimator, TransformerMixin):
@@ -151,7 +149,10 @@ def get_prepared_embeddings_model(log_dir):
     return model
 
 
-def pretrain_word_embedding_model():
+def pretrain_word_embedding_model(title=None, restore_checkpoint=False):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
+
     pretrain_data = get_pretrain_data()
     pretrain_feature_data = calculate_embeddings_and_pos_tag(pretrain_data, './cache/pretrain_features.feather')
     hypothesis_embeddings_training, premises_embeddings_training = sum_embeddings(pretrain_feature_data)
@@ -159,43 +160,30 @@ def pretrain_word_embedding_model():
     X_train = [np.array(hypothesis_embeddings_training), np.array(premises_embeddings_training)]
     Y_train = tf.one_hot(pretrain_data.label.values, 3)
 
-    # Callbacks
-    title = "try1"
-    log_directory = "logs/embedded_classifier/pretraining/" + title + "/"
-    tensorboard_log_dir = log_directory + "tensorboard_logs/"
-    pathlib.Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=False)
-    hist_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=tensorboard_log_dir,
-        histogram_freq=1,
-        write_images=True,
-        write_graph=True)
-
-    # Create a callback that saves the model's weights every 5 epochs
-    batch_size = 64
-    checkpoint_log_dir = log_directory + "model_checkpoints/"
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(
-        filepath=checkpoint_log_dir,
-        verbose=1,
-        save_weights_only=True,
-        save_freq=5 * batch_size)
-
+    model_name = "embedded_classifier"
+    batch_size = 32
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=5, restore_best_weights=True
     )
-
+    log_directory = get_log_directory(model_name, title, True)
     model = get_prepared_embeddings_model(log_directory)
-    model.fit(X_train, Y_train,
-              epochs=100,
-              validation_split=0.2,
-              callbacks=[early_stopping, hist_callback, cp_callback],
-              batch_size=batch_size)
 
-    final_weights_path = log_directory + "final_weights/weights"
-    model.save_weights(final_weights_path)
-    print("pretraining done, final weights stored to: ", final_weights_path)
+    model = train_model(X_train, Y_train,
+                                     model=model,
+                                     log_directory=log_directory,
+                                     batch_size=batch_size,
+                                     epochs=100,
+                                     additional_callbacks=[early_stopping],
+                                     restore_checkpoint=restore_checkpoint)
+
+    final_weights_path = save_final_weights(model, log_directory)
+    print("done")
 
 
-def run_word_embedding_model(train, test, load_weighs_from_pretraining=False):
+def run_word_embedding_model(train, test, title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
+
     test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train)
 
     hypothesis_embeddings_test, premises_embeddings_test = sum_embeddings(test_feature_data)
@@ -206,46 +194,54 @@ def run_word_embedding_model(train, test, load_weighs_from_pretraining=False):
     X_test = [np.array(hypothesis_embeddings_test), np.array(premises_embeddings_test)]
     Y_test = tf.one_hot(test.label.values, 3)
 
-    title = "try1"
-    log_directory = "logs/embedded_classifier/training/" + title + "/"
-    pathlib.Path(log_directory).mkdir(parents=True, exist_ok=True)
-    model = get_prepared_embeddings_model(log_directory)
-    if load_weighs_from_pretraining:
-        model.load_weights("logs/embedded_classifier/pretraining/try1/final_weights/weights")
-
+    model_name = "embedded_classifier"
+    batch_size = 32
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=20, restore_best_weights=True
+        monitor='val_loss', patience=5, restore_best_weights=True
     )
+    log_directory = get_log_directory(model_name, title)
+    model = get_prepared_embeddings_model(log_directory)
 
-    model.fit(X_train, Y_train, epochs=100, validation_split=0.2, callbacks=[early_stopping])
-    evaluate_model(model, X_test, Y_test)
+    if load_weights_from_pretraining:
+        pretrain_log_directory = get_log_directory(model_name, title, True)
+        model.load_weights(pretrain_log_directory)
 
-
-def hyperparameter_search(X_train, Y_train):
-    log_directory = "logs/embedded_classifier/"
-
-    classifier = EmbeddingClassifier()
-    tuner = kt.Hyperband(classifier,
-                         objective='val_accuracy',
-                         max_epochs=50,
-                         factor=2,
-                         directory=log_directory + 'hyperparams',
-                         )
-
-    search_title = "try"
-    tensorboard_log_dir = log_directory + "tensorboard_logs/" + search_title
-    pathlib.Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=True)
-    hist_callback = tf.keras.callbacks.TensorBoard(
-        log_dir=tensorboard_log_dir,
-        histogram_freq=1,
-        write_images=False,
-        write_graph=True)
-    stop_callback = tf.keras.callbacks.EarlyStopping(
-        monitor='val_accuracy', patience=3)
-
-    tuner.search(X_train, Y_train, validation_split=0.2, callbacks=[hist_callback, stop_callback])
-    tuner.results_summary(5)
+    model = train_model(X_train, Y_train,
+                                     model=model,
+                                     log_directory=log_directory,
+                                     batch_size=batch_size,
+                                     epochs=100,
+                                     additional_callbacks=[early_stopping],
+                                     restore_checkpoint=restore_checkpoint)
+    evaluate_model(model, X_test, Y_test, log_directory)
     print("done")
+
+#TODO: fix and rewrite if needed
+# def hyperparameter_search(X_train, Y_train):
+#     log_directory = "logs/embedded_classifier/"
+#
+#     classifier = EmbeddingClassifier()
+#     tuner = kt.Hyperband(classifier,
+#                          objective='val_accuracy',
+#                          max_epochs=50,
+#                          factor=2,
+#                          directory=log_directory + 'hyperparams',
+#                          )
+#
+#     search_title = "try"
+#     tensorboard_log_dir = log_directory + "tensorboard_logs/" + search_title
+#     pathlib.Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=True)
+#     hist_callback = tf.keras.callbacks.TensorBoard(
+#         log_dir=tensorboard_log_dir,
+#         histogram_freq=1,
+#         write_images=False,
+#         write_graph=True)
+#     stop_callback = tf.keras.callbacks.EarlyStopping(
+#         monitor='val_accuracy', patience=3)
+#
+#     tuner.search(X_train, Y_train, validation_split=0.2, callbacks=[hist_callback, stop_callback])
+#     tuner.results_summary(5)
+#     print("done")
 
 
 def run_manual_feature_model(train, test):

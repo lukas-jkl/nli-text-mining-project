@@ -111,7 +111,7 @@ def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
               batch_size=batch_size)
     with open(log_directory + "history.txt", "w") as f:
         f.write(json.dumps(history.history))
-    return model, log_directory
+    return model
 
 
 def prepare_log_callbacks(batch_size, log_directory):

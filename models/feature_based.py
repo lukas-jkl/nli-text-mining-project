@@ -180,11 +180,11 @@ def pretrain_word_embedding_model(title=None, restore_checkpoint=False):
     print("done")
 
 
-def run_word_embedding_model(train, test, title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
+def run_word_embedding_model(train, test, data_name, title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
-    test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train)
+    test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train, data_name)
 
     hypothesis_embeddings_test, premises_embeddings_test = sum_embeddings(test_feature_data)
     hypothesis_embeddings_training, premises_embeddings_training = sum_embeddings(train_feature_data)
@@ -210,7 +210,7 @@ def run_word_embedding_model(train, test, title=None, restore_checkpoint=False, 
                                      model=model,
                                      log_directory=log_directory,
                                      batch_size=batch_size,
-                                     epochs=100,
+                                     epochs=1,
                                      additional_callbacks=[early_stopping],
                                      restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)
@@ -244,8 +244,8 @@ def run_word_embedding_model(train, test, title=None, restore_checkpoint=False, 
 #     print("done")
 
 
-def run_manual_feature_model(train, test):
-    test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train)
+def run_manual_feature_model(train, test, data_name):
+    test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train, data_name)
     mlp_classifier = MLPClassifier(random_state=1, hidden_layer_sizes=(20, 20), max_iter=2000, verbose=True,
                                    early_stopping=True, n_iter_no_change=8)
     random_forest = RandomForestClassifier()

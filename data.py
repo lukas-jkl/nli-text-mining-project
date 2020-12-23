@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+from google_trans_new import google_translator
 import pandas as pd
 import matplotlib.pyplot as plt
 import spacy
@@ -52,11 +53,18 @@ def calculate_embeddings_and_pos_tag(data, cache_file):
             features = pd.read_feather(cache_file)
         else:
             raise NotImplementedError()
+        print("Loaded embeddings and pos tags from cache file: ", cache_file)
     except FileNotFoundError:
+        print("cache file ", cache_file, "not found, calculating embeddings and pos tags...")
+        print("loading spacy model...")
         nlp = spacy.load('en_core_web_lg')
-
+        print("done")
+        print("calculating premises...")
         premises = [nlp(sentence) for sentence in data["premise"]]
+        print("done")
+        print("calculating hypothesises...")
         hypothesis = [nlp(sentence) for sentence in data["hypothesis"]]
+        print("done")
 
         premises_pos_tags, premises_words, premises_word_vectors = get_word_features(premises)
         hypothesis_pos_tags, hypothesis_words, hypothesis_word_vectors = get_word_features(hypothesis)
@@ -69,18 +77,43 @@ def calculate_embeddings_and_pos_tag(data, cache_file):
             'hypothesis_word_vectors': hypothesis_word_vectors,
             'label': data["label"].values
         })
+
+        print("saving to cache file ", cache_file)
         if ext == ".pkl":
             features.to_pickle(cache_file)
         elif ext == ".feather":
             features.reset_index().to_feather(cache_file)
         else:
             raise NotImplementedError()
+        print("done")
     return features
 
-def test_training_calculate_embeddings_and_pos_tags(test, train):
-    test_feature_data = calculate_embeddings_and_pos_tag(test, './cache/test_features.pkl')
-    train_feature_data = calculate_embeddings_and_pos_tag(train, './cache/train_features.pkl')
+def test_training_calculate_embeddings_and_pos_tags(test, train, data_name):
+    test_feature_data = calculate_embeddings_and_pos_tag(test, './cache/test_' + data_name + '_features.pkl')
+    train_feature_data = calculate_embeddings_and_pos_tag(train, './cache/train_' + data_name + '_features.pkl')
     return test_feature_data, train_feature_data
+
+
+def translate_data(data, file):
+    try:
+        return pd.read_pickle(file)
+    except FileNotFoundError:
+        translator = google_translator()
+        for i, row in data[data.language != "English"].iterrows():
+            print("translating ", i, "/", data.size)
+            row.premise = translator.translate(row.premise, lang_tgt='en', lang_src=row.lang_abv)
+            # If we have multiple options we choose the first one
+            if type(row.premise) == list:
+                row.premise = row.premise[0]
+
+            row.hypothesis = translator.translate(row.hypothesis, lang_tgt='en', lang_src=row.lang_abv)
+            # If we have multiple options we choose the first one
+            if type(row.hypothesis) == list:
+                row.hypothesis = row.hypothesis[0]
+
+            data.iloc[i] = row
+        data.to_pickle(file)
+        return data
 
 
 if __name__ == '__main__':

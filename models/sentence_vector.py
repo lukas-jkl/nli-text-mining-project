@@ -166,7 +166,7 @@ def pretrain_LSTM_model(title=None, restore_checkpoint=False):
     return final_weights_path
 
 
-def run_LSTM_model(train, test, title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
+def run_LSTM_model(train, test, data_name, title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
@@ -175,7 +175,7 @@ def run_LSTM_model(train, test, title=None, restore_checkpoint=False, load_weigh
     embedding_weights = glove_vectors.vectors
     print("done")
 
-    test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train)
+    test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train, data_name)
     max_length_test = max([max([len(a) for a in test_feature_data.premises_words]),
                            max([len(b) for b in test_feature_data.hypothesis_words])])
     max_length_train = max([max([len(a) for a in train_feature_data.premises_words]),

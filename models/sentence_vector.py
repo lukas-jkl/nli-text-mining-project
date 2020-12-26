@@ -72,6 +72,9 @@ class LSTMClassifier(HyperModel):
                       optimizer='adam',
                       metrics=['accuracy'])
         model.summary()
+
+
+
         tf.keras.utils.plot_model(
             model, to_file=self.log_dir + 'lstm_model.png', show_shapes=False, show_layer_names=True,
             rankdir='TB', expand_nested=False, dpi=96
@@ -135,7 +138,7 @@ def pretrain_LSTM_model(title=None, restore_checkpoint=False):
     max_length = max([max([len(a) for a in pretrain_feature_data.premises_words]),
                       max([len(b) for b in pretrain_feature_data.hypothesis_words])])
 
-    print("loading embedding vectors")
+    print("loading embedding vectors...")
     glove_vectors = gensim.downloader.load('glove-twitter-100')
     embedding_weights = glove_vectors.vectors
     print("done")

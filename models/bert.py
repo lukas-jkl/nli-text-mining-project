@@ -6,17 +6,18 @@ from models.util import *
 
 
 def encode_sentences(tokenizer, sentence):
-    tokens = tokenizer.tokenize(sentence) + ['[SEP]']
+    tokens = tokenizer.tokenize(sentence) + [tokenizer.sep_token]
     return tokenizer.convert_tokens_to_ids(tokens)
 
 
+#TODO: no longer used
 def prepare_bert_input(data, tokenizer):
     hypothesis_encoded = tf.ragged.constant(
         [encode_sentences(tokenizer, sentence) for sentence in data.hypothesis])
     premise_encoded = tf.ragged.constant(
         [encode_sentences(tokenizer, sentence) for sentence in data.hypothesis])
     cls = tf.ragged.constant(
-        [tokenizer.convert_tokens_to_ids(['[CLS]'])] * premise_encoded.shape[0])
+        [tokenizer.convert_tokens_to_ids([tokenizer.cls_token])] * premise_encoded.shape[0])
     input_ids = tf.concat([cls, hypothesis_encoded, premise_encoded], axis=1)
 
     input_mask = tf.ones_like(input_ids).to_tensor()
@@ -35,19 +36,20 @@ def prepare_bert_input(data, tokenizer):
     return inputs
 
 
-def get_bert_base_model(model_name, max_len, log_directory):
+def get_bert_base_model(model_name, max_len, log_directory, inputs):
     bert_model = TFBertModel.from_pretrained(model_name)
-    input_word_ids = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_word_ids")
-    input_mask = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_mask")
-    input_type_ids = tf.keras.Input(shape=(max_len,), dtype=tf.int32, name="input_type_ids")
+    layer_inputs = []
+    for input in inputs:
+        layer_inputs.append(tf.keras.Input(shape=(max_len,), dtype=tf.int32, name=input))
 
-    bert = bert_model([input_word_ids, input_mask, input_type_ids])[0]
+    bert = bert_model(layer_inputs)[0]
     output = tf.keras.layers.Dense(3, activation='softmax')(bert[:, 0, :])
+    # output = tf.keras.layers.Dense(3, activation='softmax')(hidden)
 
     model = tf.keras.Model(
-        inputs=[input_word_ids, input_mask, input_type_ids],
+        inputs=layer_inputs,
         outputs=[output])
-    model.compile('adam', loss='categorical_crossentropy', metrics=['accuracy'])
+    model.compile(tf.keras.optimizers.Adam(lr=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
 
     tf.keras.utils.plot_model(
@@ -58,21 +60,24 @@ def get_bert_base_model(model_name, max_len, log_directory):
     return model
 
 
-def pretrain_bert_base_model(model_name='bert-base-uncased', title=None, restore_checkpoint=False):
+def pretrain_bert_base_model(model_name='bert-base-cased', title=None, restore_checkpoint=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
     pretrain_data = get_pretrain_data()
     tokenizer = BertTokenizer.from_pretrained(model_name)
-    X_train = prepare_bert_input(pretrain_data, tokenizer)
-    Y_train = tf.one_hot(pretrain_data.label.values, 3, axis=1)
+    prepared_data = prepare_transformer_input(pretrain_data, tokenizer)
+    X_train = prepared_data.data
+    for key in list(X_train.keys()):
+        X_train[key] = np.array(X_train[key])
+    Y_train = tf.constant(pretrain_data.label.values.astype('int32'))
 
     batch_size = 32
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=7, restore_best_weights=True
     )
     log_directory = get_log_directory(model_name, title, True)
-    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory)
+    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory, list(X_train.keys()))
     model = train_model(X_train, Y_train,
                         model=model,
                         log_directory=log_directory,
@@ -92,18 +97,19 @@ def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None,
         title = time.strftime("%Y%m%d-%H%M%S")
     tokenizer = BertTokenizer.from_pretrained(model_name)
 
-    test = test.assign(test=True)
-    train = train.assign(test=False)
+    test = test.assign(test=False)
+    train = train.assign(test=True)
     data = train.append(test)
-    X = prepare_bert_input(data, tokenizer)
+    prepared_data = prepare_transformer_input(data, tokenizer)
+    X = prepared_data.data
 
     X_train, X_test = dict(), dict()
     for key in X.keys():
-        X_train[key] = X[key][data.test.values == False]
-        X_test[key] = X[key][data.test.values == True]
+        X_train[key] = np.array(X[key][data.test.values == False])
+        X_test[key] = np.array(X[key][data.test.values == True])
 
-    Y_train = tf.one_hot(train.label.values, 3, axis=1)
-    Y_test = tf.one_hot(test.label.values, 3, axis=1)
+    Y_train = train.label.values # tf.one_hot(train.label.values, 3, axis=1)
+    Y_test = test.label.values # tf.one_hot(test.label.values, 3, axis=1)
 
     batch_size = 32
     early_stopping = tf.keras.callbacks.EarlyStopping(
@@ -111,7 +117,7 @@ def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None,
     )
 
     log_directory = get_log_directory(model_name, title)
-    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory)
+    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory, list(X_train.keys()))
 
     if load_weights_from_pretraining:
         pretrain_log_directory = get_log_directory(model_name, title, True)

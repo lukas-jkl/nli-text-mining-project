@@ -6,6 +6,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import spacy
 
+
 def load_data():
     training_data = pd.read_csv('data/train.csv')
     unlabeled_test_data = pd.read_csv('data/test.csv')
@@ -16,7 +17,7 @@ def explore_data(data, name):
     data['label'] = data['label'].replace([0], 'entailment')
     data['label'] = data['label'].replace([1], 'neutral')
     data['label'] = data['label'].replace([2], 'contradiction')
-    data[['language', 'label']].groupby(by='label')['language'].value_counts()\
+    data[['language', 'label']].groupby(by='label')['language'].value_counts() \
         .unstack(0).plot(kind='bar')
     plt.title(name)
     plt.xlabel('Language')
@@ -88,6 +89,7 @@ def calculate_embeddings_and_pos_tag(data, cache_file):
         print("done")
     return features
 
+
 def test_training_calculate_embeddings_and_pos_tags(test, train, data_name):
     test_feature_data = calculate_embeddings_and_pos_tag(test, './cache/test_' + data_name + '_features.pkl')
     train_feature_data = calculate_embeddings_and_pos_tag(train, './cache/train_' + data_name + '_features.pkl')
@@ -114,6 +116,23 @@ def translate_data(data, file):
             data.iloc[i] = row
         data.to_pickle(file)
         return data
+
+
+def get_english_labled_data():
+    labeled_data, _ = load_data()
+    english_data = labeled_data[labeled_data.lang_abv == "en"]
+    return split_test_training(english_data)
+
+def get_translated_labled_data():
+    labeled_data, _ = load_data()
+    translated_data = translate_data(labeled_data, "./cache/labeled_data_translated.pkl")
+    return split_test_training(translated_data)
+
+def split_test_training(data):
+    train, test = \
+        np.split(data.sample(frac=1, random_state=42),
+                 [int(.85 * len(data))])
+    return train, test
 
 
 if __name__ == '__main__':

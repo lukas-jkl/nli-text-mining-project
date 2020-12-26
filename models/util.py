@@ -114,6 +114,10 @@ def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
     return model
 
 
+def prepare_transformer_input(data, tokenizer):
+    return tokenizer(data.premise.values.tolist(), data.hypothesis.values.tolist(), padding=True)
+
+
 def prepare_log_callbacks(batch_size, log_directory):
     tensorboard_log_dir = log_directory + "tensorboard_logs/"
 

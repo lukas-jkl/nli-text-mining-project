@@ -80,7 +80,7 @@ def run_roberta(train, test, model_name="jplu/tf-xlm-roberta-base", title=None, 
 
     if load_weights_from_pretraining:
         pretrain_log_directory = get_log_directory(model_name, title, True)
-        model.load_weights(pretrain_log_directory)
+        load_final_weights(model, pretrain_log_directory)
 
     model = train_model(X_train, Y_train,
                         model=model,

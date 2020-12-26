@@ -204,13 +204,13 @@ def run_word_embedding_model(train, test, data_name, title=None, restore_checkpo
 
     if load_weights_from_pretraining:
         pretrain_log_directory = get_log_directory(model_name, title, True)
-        model.load_weights(pretrain_log_directory)
+        load_final_weights(model, pretrain_log_directory)
 
     model = train_model(X_train, Y_train,
                                      model=model,
                                      log_directory=log_directory,
                                      batch_size=batch_size,
-                                     epochs=1,
+                                     epochs=100,
                                      additional_callbacks=[early_stopping],
                                      restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)

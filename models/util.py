@@ -93,6 +93,12 @@ def save_final_weights(model, log_directory):
     return final_weights_path
 
 
+def load_final_weights(model, log_directory):
+    final_weights_path = log_directory + "final_weights/weights"
+    model.load_weights(final_weights_path)
+    print("loaded weights from", final_weights_path)
+
+
 def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
                 additional_callbacks, restore_checkpoint):
     hist_callback, cp_callback = prepare_log_callbacks(batch_size, log_directory)

@@ -8,8 +8,7 @@ import models.bert
 import tensorflow as tf
 import numpy as np
 
-from models.roberta import run_roberta
-
+import models.roberta
 
 def main():
     labeled_data, unlabeled_data = data.load_data()
@@ -31,7 +30,7 @@ def main():
     model_name = "distilbert-base-cased"
     # models.roberta.pretrain_roberta_model(model_name=model_name, title=title)
     # models.bert.pretrain_bert_base_model(model_name=model_name, title=title)
-    run_roberta(train_multilang, test_multilang, model_name="jplu/tf-xlm-roberta-base", title="try2")
+    # models.roberta.run_roberta(train_multilang, test_multilang, model_name="jplu/tf-xlm-roberta-base", title="try2")
     # models.bert.run_bert_base_model(train_translated, test_translated, model_name=model_name, title=title)
     print("done")
 

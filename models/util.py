@@ -113,9 +113,35 @@ def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
         f.write(json.dumps(history.history))
     return model
 
+def prepare_transformer_pretrain_data(pretrain_data, tokenizer, max_len):
+    prepared_data = encode_transformer_input(pretrain_data, tokenizer, max_len)
+    X_train = prepared_data.data
+    for key in list(X_train.keys()):
+        X_train[key] = np.array(X_train[key])
+    Y_train = tf.constant(pretrain_data.label.values.astype('int32'))
+    return X_train, Y_train
 
-def prepare_transformer_input(data, tokenizer):
-    return tokenizer(data.premise.values.tolist(), data.hypothesis.values.tolist(), padding=True)
+
+def prepare_transformer_training_test_data(train, test, tokenizer, max_len):
+    test = test.assign(test=True)
+    train = train.assign(test=False)
+    data = train.append(test)
+    prepared_data = encode_transformer_input(data, tokenizer, max_len)
+    X = prepared_data.data
+
+    X_train, X_test = dict(), dict()
+    for key in X.keys():
+        X_train[key] = np.array(X[key])[data.test.values == False]
+        X_test[key] = np.array(X[key])[data.test.values == True]
+
+    Y_train = train.label.values  # tf.one_hot(train.label.values, 3, axis=1)
+    Y_test = test.label.values  # tf.one_hot(test.label.values, 3, axis=1)
+    return X_train, Y_train, X_test, Y_test
+
+
+def encode_transformer_input(data, tokenizer, max_len):
+    return tokenizer(data.premise.values.tolist(), data.hypothesis.values.tolist(),
+                     max_length=max_len, truncation=True, padding="max_length")
 
 
 def prepare_log_callbacks(batch_size, log_directory):

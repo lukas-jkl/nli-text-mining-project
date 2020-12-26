@@ -1,7 +1,6 @@
 import time
 
 from transformers import AutoTokenizer, AutoModelForSequenceClassification, TFAutoModel, TFXLMRobertaModel
-from models.bert import prepare_transformer_input
 import tensorflow as tf
 
 from models.util import *
@@ -13,15 +12,12 @@ def pretrain_roberta_model(model_name='bert-base-cased', title=None, restore_che
 
     pretrain_data = get_pretrain_data()
     tokenizer = AutoTokenizer.from_pretrained(model_name, padding=True, use_fast=True)
-    prepared_data = prepare_transformer_input(pretrain_data, tokenizer)
-    X_train = prepared_data.data
-    for key in list(X_train.keys()):
-        X_train[key] = np.array(X_train[key])
-    Y_train = tf.constant(pretrain_data.label.values.astype('int32'))
+    max_len = 50
+    X_train, Y_train = prepare_transformer_pretrain_data(pretrain_data, tokenizer, max_len)
 
     batch_size = 32
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=7, restore_best_weights=True
+        monitor='val_loss', patience=2, restore_best_weights=True
     )
     log_directory = get_log_directory(model_name, title, True)
     model = get_roberta_model(model_name, list(X_train.values())[0].shape[1], log_directory, list(X_train.keys()))
@@ -67,30 +63,20 @@ def get_roberta_model(model_name, max_len, log_directory, inputs):
 
 def run_roberta(train, test, model_name="jplu/tf-xlm-roberta-base", title=None, restore_checkpoint=False,
                         load_weights_from_pretraining=False):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
+
     tokenizer = AutoTokenizer.from_pretrained(model_name, padding=True, use_fast=True)
-
-
-    test = test.assign(test=False)
-    train = train.assign(test=True)
-    data = train.append(test)
-    prepared_data = prepare_transformer_input(data, tokenizer)
-    X = prepared_data.data
-
-    X_train, X_test = dict(), dict()
-    for key in X.keys():
-        X_train[key] = np.array(X[key])[data.test.values == False]
-        X_test[key] = np.array(X[key])[data.test.values == True]
-
-    Y_train = train.label.values
-    Y_test = test.label.values
+    max_len = 50
+    X_train, Y_train, X_test, Y_test = prepare_transformer_training_test_data(train, test, tokenizer, max_len)
 
     batch_size = 32
     early_stopping = tf.keras.callbacks.EarlyStopping(
-        monitor='val_loss', patience=7, restore_best_weights=True
+        monitor='val_loss', patience=2, restore_best_weights=True
     )
 
     log_directory = get_log_directory(model_name, title)
-    model = get_roberta_model(model_name, list(X_train.values())[0].shape[1], log_directory, list(X.keys()))
+    model = get_roberta_model(model_name, max_len, log_directory, list(X_train.keys()))
 
     if load_weights_from_pretraining:
         pretrain_log_directory = get_log_directory(model_name, title, True)
@@ -100,7 +86,7 @@ def run_roberta(train, test, model_name="jplu/tf-xlm-roberta-base", title=None, 
                         model=model,
                         log_directory=log_directory,
                         batch_size=batch_size,
-                        epochs=100,
+                        epochs=50,
                         additional_callbacks=[early_stopping],
                         restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)

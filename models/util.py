@@ -62,7 +62,6 @@ def evaluate_model(model, X_test, Y_test, log_dir):
     log_dir += "/final_model/"
 
     print(model.evaluate(X_test, Y_test))
-    tf.keras.models.save_model(model, log_dir + "final_model")
     Y_pred = model.predict(X_test)
     cnf_matrix = confusion_matrix(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1))
     plt.figure()
@@ -74,6 +73,11 @@ def evaluate_model(model, X_test, Y_test, log_dir):
     with open(log_dir + '/classification_report.txt', 'w') as file:
         file.write(class_report)
     print(class_report)
+    try:
+        tf.keras.models.save_model(model, log_dir + "final_model")
+    except:
+        print("Failed to save the model, try to save weights instead")
+        model.save_weights(log_dir + "final_model_weights")
 
 
 def get_log_directory(model_name, title, pretraining=False):

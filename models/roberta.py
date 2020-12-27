@@ -34,18 +34,21 @@ def pretrain_roberta_model(model_name='bert-base-cased', title=None, restore_che
     return final_weights_path
 
 
-def get_roberta_model(model_name, max_len, log_directory, inputs):
-    roberta = TFXLMRobertaModel.from_pretrained(model_name)
+def get_roberta_model(model_name, max_len, log_directory, inputs, max_pool):
+    roberta_model = TFXLMRobertaModel.from_pretrained(model_name)
     layer_inputs = []
     for input in inputs:
         layer_inputs.append(tf.keras.Input(shape=(max_len,), dtype=tf.int32, name=input))
 
-    roberta_layer = roberta(layer_inputs)[0]#[:, 0, :]
-    hidden_layer = tf.keras.layers.GlobalAveragePooling1D()(roberta_layer)
-    hidden_layer = tf.keras.layers.Dropout(0.25)(hidden_layer)
-    hidden_layer = tf.keras.layers.Dense(32, activation='relu')(hidden_layer)
-    hidden_layer = tf.keras.layers.Dense(16, activation='relu')(hidden_layer)
-    output = tf.keras.layers.Dense(3, activation='softmax')(hidden_layer)
+    roberta_layer = roberta_model(layer_inputs)[0]
+    if not max_pool:
+        output = tf.keras.layers.Dense(3, activation='softmax')(roberta_layer[:, 0, :])
+    else:
+        hidden_layer = tf.keras.layers.GlobalAveragePooling1D()(roberta_layer)
+        hidden_layer = tf.keras.layers.Dropout(0.25)(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(32, activation='relu')(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(16, activation='relu')(hidden_layer)
+        output = tf.keras.layers.Dense(3, activation='softmax')(hidden_layer)
 
     model = tf.keras.Model(
         inputs=layer_inputs,

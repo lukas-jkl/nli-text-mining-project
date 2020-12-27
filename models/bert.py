@@ -36,15 +36,21 @@ def prepare_bert_input(data, tokenizer):
     return inputs
 
 
-def get_bert_base_model(model_name, max_len, log_directory, inputs):
+def get_bert_base_model(model_name, max_len, log_directory, inputs, max_pool):
     bert_model = TFBertModel.from_pretrained(model_name)
     layer_inputs = []
     for input in inputs:
         layer_inputs.append(tf.keras.Input(shape=(max_len,), dtype=tf.int32, name=input))
 
-    bert = bert_model(layer_inputs)[0]
-    output = tf.keras.layers.Dense(3, activation='softmax')(bert[:, 0, :])
-    # output = tf.keras.layers.Dense(3, activation='softmax')(hidden)
+    bert_layer = bert_model(layer_inputs)[0]
+    if not max_pool:
+        output = tf.keras.layers.Dense(3, activation='softmax')(bert_layer[:, 0, :])
+    else:
+        hidden_layer = tf.keras.layers.GlobalAveragePooling1D()(bert_layer)
+        hidden_layer = tf.keras.layers.Dropout(0.25)(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(32, activation='relu')(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(16, activation='relu')(hidden_layer)
+        output = tf.keras.layers.Dense(3, activation='softmax')(hidden_layer)
 
     model = tf.keras.Model(
         inputs=layer_inputs,
@@ -60,7 +66,7 @@ def get_bert_base_model(model_name, max_len, log_directory, inputs):
     return model
 
 
-def pretrain_bert_base_model(model_name='bert-base-cased', title=None, restore_checkpoint=False):
+def pretrain_bert_base_model(model_name='bert-base-cased', max_pool=False, title=None, restore_checkpoint=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
@@ -74,7 +80,8 @@ def pretrain_bert_base_model(model_name='bert-base-cased', title=None, restore_c
         monitor='val_loss', patience=2, restore_best_weights=True
     )
     log_directory = get_log_directory(model_name, title, True)
-    model = get_bert_base_model(model_name, list(X_train.values())[0].shape[1], log_directory, list(X_train.keys()))
+    model = get_bert_base_model(model_name,
+                                max_len, log_directory, list(X_train.keys()), max_pool)
     model = train_model(X_train, Y_train,
                         model=model,
                         log_directory=log_directory,
@@ -88,7 +95,7 @@ def pretrain_bert_base_model(model_name='bert-base-cased', title=None, restore_c
     return final_weights_path
 
 
-def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None, restore_checkpoint=False,
+def run_bert_base_model(train, test, model_name='bert-base-uncased', max_pool=False, title=None, restore_checkpoint=False,
                         load_weights_from_pretraining=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
@@ -103,7 +110,7 @@ def run_bert_base_model(train, test, model_name='bert-base-uncased', title=None,
     )
 
     log_directory = get_log_directory(model_name, title)
-    model = get_bert_base_model(model_name, max_len, log_directory, list(X_train.keys()))
+    model = get_bert_base_model(model_name, max_len, log_directory, list(X_train.keys()), max_pool)
 
     if load_weights_from_pretraining:
         pretrain_log_directory = get_log_directory(model_name, title, True)

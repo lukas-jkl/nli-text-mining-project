@@ -79,10 +79,10 @@ def evaluate_model(model, X_test, Y_test, log_dir):
         file.write(class_report)
     print(class_report)
     try:
-        tf.keras.models.save_model(model, log_dir + "final_model")
+        tf.keras.models.save_model(model, log_dir + "model")
     except:
         print("Failed to save the model, try to save weights instead")
-        model.save_weights(log_dir + "final_model_weights")
+        model.save_weights(log_dir + "weights")
 
 
 def get_log_directory(model_name, title, pretraining=False):
@@ -119,14 +119,16 @@ def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
         print("done")
 
     history = model.fit(X_train, Y_train,
-              epochs=epochs,
-              verbose=1,
-              validation_split=0.2,
-              callbacks=callbacks,
-              batch_size=batch_size)
+                        epochs=epochs,
+                        verbose=1,
+                        validation_split=0.2,
+                        callbacks=callbacks,
+                        batch_size=batch_size)
+
     with open(log_directory + "history.txt", "w") as f:
         f.write(json.dumps(history.history))
     return model
+
 
 def prepare_transformer_pretrain_data(pretrain_data, tokenizer, max_len):
     prepared_data = encode_transformer_input(pretrain_data, tokenizer, max_len)

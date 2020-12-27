@@ -10,32 +10,6 @@ def encode_sentences(tokenizer, sentence):
     return tokenizer.convert_tokens_to_ids(tokens)
 
 
-#TODO: no longer used
-def prepare_bert_input(data, tokenizer):
-    hypothesis_encoded = tf.ragged.constant(
-        [encode_sentences(tokenizer, sentence) for sentence in data.hypothesis])
-    premise_encoded = tf.ragged.constant(
-        [encode_sentences(tokenizer, sentence) for sentence in data.hypothesis])
-    cls = tf.ragged.constant(
-        [tokenizer.convert_tokens_to_ids([tokenizer.cls_token])] * premise_encoded.shape[0])
-    input_ids = tf.concat([cls, hypothesis_encoded, premise_encoded], axis=1)
-
-    input_mask = tf.ones_like(input_ids).to_tensor()
-
-    type_cls = tf.zeros_like(cls)
-    type_hypothesis = tf.zeros_like(hypothesis_encoded)
-    type_premise = tf.ones_like(premise_encoded)
-    input_type_ids = tf.concat(
-        [type_cls, type_hypothesis, type_premise], axis=-1).to_tensor()
-
-    inputs = {
-        'input_word_ids': input_ids.to_tensor(),
-        'input_mask': input_mask,
-        'input_type_ids': input_type_ids
-    }
-    return inputs
-
-
 def get_bert_base_model(model_name, max_len, log_directory, inputs, max_pool):
     bert_model = TFBertModel.from_pretrained(model_name)
     layer_inputs = []
@@ -66,13 +40,12 @@ def get_bert_base_model(model_name, max_len, log_directory, inputs, max_pool):
     return model
 
 
-def pretrain_bert_base_model(model_name='bert-base-cased', max_pool=False, title=None, restore_checkpoint=False):
+def pretrain_bert_model(model_name='bert-base-cased', max_len=50, max_pool=False, title=None, restore_checkpoint=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
     pretrain_data = get_pretrain_data()
     tokenizer = BertTokenizer.from_pretrained(model_name)
-    max_len = 50
     X_train, Y_train = prepare_transformer_pretrain_data(pretrain_data, tokenizer, max_len)
 
     batch_size = 32
@@ -86,7 +59,7 @@ def pretrain_bert_base_model(model_name='bert-base-cased', max_pool=False, title
                         model=model,
                         log_directory=log_directory,
                         batch_size=batch_size,
-                        epochs=100,
+                        epochs=40,
                         additional_callbacks=[early_stopping],
                         restore_checkpoint=restore_checkpoint)
 
@@ -95,13 +68,13 @@ def pretrain_bert_base_model(model_name='bert-base-cased', max_pool=False, title
     return final_weights_path
 
 
-def run_bert_base_model(train, test, model_name='bert-base-uncased', max_pool=False, title=None, restore_checkpoint=False,
-                        load_weights_from_pretraining=False):
+def run_bert_model(train, test, model_name='bert-base-uncased', max_len=50, max_pool=False, title=None,
+                   restore_checkpoint=False,
+                   load_weights_from_pretraining=False, max_epochs=40):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
     tokenizer = BertTokenizer.from_pretrained(model_name)
-    max_len = 50
     X_train, Y_train, X_test, Y_test = prepare_transformer_training_test_data(train, test, tokenizer, max_len)
 
     batch_size = 32
@@ -120,7 +93,7 @@ def run_bert_base_model(train, test, model_name='bert-base-uncased', max_pool=Fa
                         model=model,
                         log_directory=log_directory,
                         batch_size=batch_size,
-                        epochs=50,
+                        epochs=max_epochs,
                         additional_callbacks=[early_stopping],
                         restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)

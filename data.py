@@ -118,15 +118,25 @@ def translate_data(data, file):
         return data
 
 
-def get_english_labled_data():
+def get_english_labeled_data():
     labeled_data, _ = load_data()
     english_data = labeled_data[labeled_data.lang_abv == "en"]
-    return split_test_training(english_data)
+    train, test = split_test_training(english_data)
+    return "only_english", train, test
 
-def get_translated_labled_data():
+
+def get_translated_labeled_data():
     labeled_data, _ = load_data()
     translated_data = translate_data(labeled_data, "./cache/labeled_data_translated.pkl")
-    return split_test_training(translated_data)
+    train, test = split_test_training(translated_data)
+    return "translated_english", train, test
+
+
+def get_multilang_labeled_data():
+    labeled_data, _ = load_data()
+    train, test = split_test_training(labeled_data)
+    return "multilang", train, test
+
 
 def split_test_training(data):
     train, test = \

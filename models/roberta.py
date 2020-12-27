@@ -6,13 +6,12 @@ import tensorflow as tf
 from models.util import *
 
 
-def pretrain_roberta_model(model_name='bert-base-cased', title=None, restore_checkpoint=False):
+def pretrain_roberta_model(model_name="jplu/tf-xlm-roberta-base", max_len=50, max_pool=False, title=None, restore_checkpoint=False):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
     pretrain_data = get_pretrain_data()
     tokenizer = AutoTokenizer.from_pretrained(model_name, padding=True, use_fast=True)
-    max_len = 50
     X_train, Y_train = prepare_transformer_pretrain_data(pretrain_data, tokenizer, max_len)
 
     batch_size = 32
@@ -20,12 +19,13 @@ def pretrain_roberta_model(model_name='bert-base-cased', title=None, restore_che
         monitor='val_loss', patience=2, restore_best_weights=True
     )
     log_directory = get_log_directory(model_name, title, True)
-    model = get_roberta_model(model_name, list(X_train.values())[0].shape[1], log_directory, list(X_train.keys()))
+    model = get_roberta_model(model_name,
+                              max_len, log_directory, list(X_train.keys()), max_pool)
     model = train_model(X_train, Y_train,
                         model=model,
                         log_directory=log_directory,
                         batch_size=batch_size,
-                        epochs=100,
+                        epochs=40,
                         additional_callbacks=[early_stopping],
                         restore_checkpoint=restore_checkpoint)
 
@@ -64,13 +64,12 @@ def get_roberta_model(model_name, max_len, log_directory, inputs, max_pool):
     return model
 
 
-def run_roberta(train, test, model_name="jplu/tf-xlm-roberta-base", title=None, restore_checkpoint=False,
-                        load_weights_from_pretraining=False):
+def run_roberta_model(train, test, model_name="jplu/tf-xlm-roberta-base", max_len=50, max_pool=False, title=None,
+                      restore_checkpoint=False, load_weights_from_pretraining=False, max_epochs=40):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
     tokenizer = AutoTokenizer.from_pretrained(model_name, padding=True, use_fast=True)
-    max_len = 50
     X_train, Y_train, X_test, Y_test = prepare_transformer_training_test_data(train, test, tokenizer, max_len)
 
     batch_size = 32
@@ -79,7 +78,7 @@ def run_roberta(train, test, model_name="jplu/tf-xlm-roberta-base", title=None, 
     )
 
     log_directory = get_log_directory(model_name, title)
-    model = get_roberta_model(model_name, max_len, log_directory, list(X_train.keys()))
+    model = get_roberta_model(model_name, max_len, log_directory, list(X_train.keys()), max_pool)
 
     if load_weights_from_pretraining:
         pretrain_log_directory = get_log_directory(model_name, title, True)
@@ -89,7 +88,7 @@ def run_roberta(train, test, model_name="jplu/tf-xlm-roberta-base", title=None, 
                         model=model,
                         log_directory=log_directory,
                         batch_size=batch_size,
-                        epochs=50,
+                        epochs=max_epochs,
                         additional_callbacks=[early_stopping],
                         restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)

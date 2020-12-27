@@ -73,7 +73,8 @@ class LSTMClassifier(HyperModel):
                       metrics=['accuracy'])
         model.summary()
 
-
+        with open(self.log_dir + 'hyperparameters.txt', 'w') as f:
+            f.write(json.dumps(hp.values))
 
         tf.keras.utils.plot_model(
             model, to_file=self.log_dir + 'lstm_model.png', show_shapes=False, show_layer_names=True,

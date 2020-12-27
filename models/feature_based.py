@@ -122,6 +122,10 @@ class EmbeddingClassifier(HyperModel):
         model.compile(loss='categorical_crossentropy',
                       optimizer='adam',
                       metrics=['accuracy'])
+
+        with open(self.log_dir + 'hyperparameters.txt', 'w') as f:
+            f.write(json.dumps(hp.values))
+
         model.summary()
         tf.keras.utils.plot_model(
             model, to_file=self.log_dir + 'embedded_model.png', show_shapes=False, show_layer_names=True,

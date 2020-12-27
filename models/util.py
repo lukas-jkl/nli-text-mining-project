@@ -60,16 +60,21 @@ def get_pretrain_data(number_samples=100000):
 
 def evaluate_model(model, X_test, Y_test, log_dir):
     log_dir += "/final_model/"
+    pathlib.Path(log_dir).mkdir(parents=True, exist_ok=True)
 
     print(model.evaluate(X_test, Y_test))
     Y_pred = model.predict(X_test)
-    cnf_matrix = confusion_matrix(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1))
+
+    if len(np.array(Y_test).shape) == 2:
+        Y_test = np.argmax(Y_test, 1)
+
+    cnf_matrix = confusion_matrix(Y_test, np.argmax(Y_pred, 1))
     plt.figure()
     custom_plot_confusion_matrix(cnf_matrix, classes=[0, 1, 2],
                                  title='Confusion matrix')
     plt.savefig(log_dir + "/confusion_matrix.png")
     plt.show()
-    class_report = classification_report(np.argmax(np.array(Y_test), 1), np.argmax(Y_pred, 1))
+    class_report = classification_report(Y_test, np.argmax(Y_pred, 1))
     with open(log_dir + '/classification_report.txt', 'w') as file:
         file.write(class_report)
     print(class_report)

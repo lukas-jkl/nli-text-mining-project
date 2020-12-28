@@ -1,7 +1,7 @@
 import os
 import time
 import zipfile
-
+import pickle as pkl
 import gensim
 import gensim.downloader
 import kerastuner as kt
@@ -13,7 +13,7 @@ from models.util import *
 
 
 class LSTMClassifier(HyperModel):
-    def __init__(self, embedding_weights, log_dir, sentence_length=300, num_outputs=3):
+    def __init__(self, embedding_weights, log_dir, sentence_length, num_outputs=3):
         super().__init__()
         self.embedding_weights = embedding_weights
         self.log_dir = log_dir
@@ -21,10 +21,14 @@ class LSTMClassifier(HyperModel):
         self.sentence_length = sentence_length
 
     def build(self, hp):
+        separate_hidden_layer_neurons = hp.Choice("separate_hidden_layer_neurons", [32, 64, 128])
+        separate_hidden_layer_num_layers = hp.Choice("separate_hidden_layer_num_layers", [0, 1, 2])
+        concat_hidden_neurons = hp.Choice("concat_hidden_layer_neurons", [64, 128])
+        concat_hidden_layers = hp.Choice("concat_hidden_layer_num_layers", [0, 1])
         lstm_units = hp.Choice("lstm_units", [32, 64, 128])
-        lstm_dropout = hp.Choice("lstm_dropout", [0.0, 0.01, 0.05, 0.1])
-        concat_hidden_neurons = hp.Choice("concat_hidden_layer_neurons", [32, 64, 128])
-        concat_hidden_layers = hp.Choice("concat_hidden_layer_num_layers", [1, 2, 3])
+        lstm_dropout = hp.Choice("lstm_dropout", [0.0, 0.01, 0.1])
+        final_hidden_layer_num_layers = hp.Choice("final_hidden_layer_num_layers", [1, 2])
+        final_hidden_layer_neurons = hp.Choice("final_hidden_layer_neurons", [32, 64, 128])
 
         layer_hypothesis = input_hypothesis = tf.keras.Input(dtype=tf.int32, shape=(self.sentence_length,),
                                                              name="hypothesis_input_layer")
@@ -49,6 +53,13 @@ class LSTMClassifier(HyperModel):
 
         layer_hypothesis = embedding_layer_hypothesis(layer_hypothesis)
         layer_premises = embedding_layer_premises(layer_premises)
+        separate_hidden_layers = [separate_hidden_layer_neurons] * separate_hidden_layer_num_layers
+        for i, neurons in enumerate(separate_hidden_layers):
+            layer_hypothesis = tf.keras.layers.Dense(concat_hidden_neurons, activation='relu',
+                                                     name="hypothesis_dense_hidden_layer_" + str(i))(layer_hypothesis)
+            layer_premises = tf.keras.layers.Dense(concat_hidden_neurons, activation='relu',
+                                                   name="premise_dense_hidden_layer_" + str(i))(layer_premises)
+
         concat = tf.keras.layers.concatenate([layer_premises, layer_hypothesis], axis=1, name="concatenation_layer")
 
         concat_hidden_layers = [concat_hidden_neurons] * concat_hidden_layers
@@ -60,6 +71,11 @@ class LSTMClassifier(HyperModel):
                                       activation='tanh',
                                       dropout=lstm_dropout)(concat)
 
+        final_hidden_layers = [final_hidden_layer_neurons] * final_hidden_layer_num_layers
+        for i, neurons in enumerate(final_hidden_layers):
+            concat = tf.keras.layers.Dense(concat_hidden_neurons, activation='relu',
+                                           name="final_dense_hidden_layer_" + str(i))(concat)
+
         final_dense_neurons = self.output_size
         output = tf.keras.layers.Dense(final_dense_neurons, activation='softmax',
                                        name="output_layer")(concat)
@@ -68,7 +84,7 @@ class LSTMClassifier(HyperModel):
                                outputs=[output],
                                name=self.name)
 
-        model.compile(loss='categorical_crossentropy',
+        model.compile(loss='sparse_categorical_crossentropy',
                       optimizer='adam',
                       metrics=['accuracy'])
         model.summary()
@@ -90,6 +106,8 @@ def get_prepared_LSTM_model(embedding_weights, log_dir, max_len):
         hp.Fixed("lstm_dropout", 0.05),
         hp.Fixed("concat_hidden_layer_num_layers", 2),
         hp.Fixed("concat_hidden_layer_neurons", 128),
+        hp.Fixed("separate_hidden_layer_neurons", 128),
+        hp.Fixed("separate_hidden_layer_num_layers", 1),
     ]
 
     classifier = LSTMClassifier(embedding_weights, log_dir, sentence_length=max_len)
@@ -97,7 +115,7 @@ def get_prepared_LSTM_model(embedding_weights, log_dir, max_len):
 
     model.compile(
         optimizer='adam',
-        loss='categorical_crossentropy',
+        loss='sparse_categorical_crossentropy',
         metrics=['accuracy'],
     )
     return model
@@ -127,7 +145,47 @@ def encode_strings_with_dict(data, vocab, maxlen):
                                                          padding='post', value=0, maxlen=maxlen)
 
 
-def pretrain_LSTM_model(title=None, restore_checkpoint=False):
+def hyperparameter_search(title=None, gensim_embeddings="glove-twitter-100", max_len=50):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
+
+    # Prepare data - use pretraining data for hyperparameter tuning
+    pretrain_data = get_pretrain_data()
+    pretrain_feature_data = calculate_embeddings_and_pos_tag(pretrain_data, './cache/pretrain_features.feather')
+    vocab, embedding_weights = load_and_cache_embeddings(gensim_embeddings)
+    X_train = [
+        encode_strings_with_dict(pretrain_feature_data.hypothesis_words.values, vocab, max_len),
+        encode_strings_with_dict(pretrain_feature_data.premises_words.values, vocab, max_len)
+    ]
+    Y_train = np.array(pretrain_data.label.values, dtype='int32')
+
+    model_name = "lstm_classifier"
+
+    log_directory = get_log_directory(model_name, title=title, pretraining=True)
+    vocab, embedding_weights = load_and_cache_embeddings(gensim_embeddings)
+    classifier = LSTMClassifier(embedding_weights=embedding_weights, log_dir=log_directory, sentence_length=max_len)
+
+    stop_callback = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy', patience=3)
+
+    hist_callback = tf.keras.callbacks.TensorBoard(
+        log_dir=log_directory,
+        histogram_freq=1,
+        write_images=False,
+        write_graph=True,
+        profile_batch=2)
+
+    tuner = kt.Hyperband(classifier,
+                         objective='val_accuracy',
+                         max_epochs=30,
+                         directory=log_directory,
+                         project_name="lstm_tuning"
+                         )
+    tuner.search(X_train, Y_train, validation_split=0.2, callbacks=[hist_callback, stop_callback])
+    tuner.results_summary(10)
+    print("done")
+
+
+def pretrain_LSTM_model(title=None, restore_checkpoint=False, gensim_embeddings="glove-twitter-100", max_len=50):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
@@ -136,67 +194,87 @@ def pretrain_LSTM_model(title=None, restore_checkpoint=False):
 
     pretrain_feature_data = calculate_embeddings_and_pos_tag(pretrain_data, './cache/pretrain_features.feather')
 
-    max_length = max([max([len(a) for a in pretrain_feature_data.premises_words]),
-                      max([len(b) for b in pretrain_feature_data.hypothesis_words])])
+    # max_length = max([max([len(a) for a in pretrain_feature_data.premises_words]),
+    #                   max([len(b) for b in pretrain_feature_data.hypothesis_words])])
 
     print("loading embedding vectors...")
-    glove_vectors = gensim.downloader.load('glove-twitter-100')
-    embedding_weights = glove_vectors.vectors
+    vocab, embedding_weights = load_and_cache_embeddings(gensim_embeddings)
     print("done")
 
     X_train = [
-        encode_strings_with_dict(pretrain_feature_data.hypothesis_words.values, glove_vectors.vocab, max_length),
-        encode_strings_with_dict(pretrain_feature_data.premises_words.values, glove_vectors.vocab, max_length)
+        encode_strings_with_dict(pretrain_feature_data.hypothesis_words.values, vocab, max_len),
+        encode_strings_with_dict(pretrain_feature_data.premises_words.values, vocab, max_len)
     ]
-    Y_train = tf.one_hot(pretrain_data.label.values, 3)
+    Y_train = np.array(pretrain_data.label.values, dtype='int32')
 
     model_name = "lstm_classifier"
-    batch_size = 64
+    batch_size = 32
     early_stopping = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=5, restore_best_weights=True
     )
     log_directory = get_log_directory(model_name, title, True)
-    model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
+    model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_len)
     model = train_model(X_train, Y_train,
-                                     model=model,
-                                     log_directory=log_directory,
-                                     batch_size=batch_size,
-                                     epochs=100,
-                                     additional_callbacks=[early_stopping],
-                                     restore_checkpoint=restore_checkpoint)
+                        model=model,
+                        log_directory=log_directory,
+                        batch_size=batch_size,
+                        epochs=100,
+                        additional_callbacks=[early_stopping],
+                        restore_checkpoint=restore_checkpoint)
 
     final_weights_path = save_final_weights(model, log_directory)
     print("done")
     return final_weights_path
 
 
-def run_LSTM_model(train, test, data_name, title=None, restore_checkpoint=False, load_weights_from_pretraining=False):
+def load_and_cache_embeddings(embedding_vectors):
+    vocab_file = './cache/embeddings_' + embedding_vectors + '_vocab.pkl'
+    vector_file = './cache/embeddings_' + embedding_vectors + '_vectors.pkl'
+
+    try:
+        with open(vocab_file, 'rb') as f:
+            vocab = pkl.load(f)
+        with open(vector_file, 'rb') as f:
+            vector = pkl.load(f)
+    except:
+        glove_vectors = gensim.downloader.load(embedding_vectors)
+        vocab = glove_vectors.vocab
+        vector = glove_vectors.vectors
+        with open(vocab_file, 'wb') as f:
+            pkl.dump(vocab, f)
+        with open(vector_file, 'wb') as f:
+            pkl.dump(vector, f)
+    return vocab, vector
+
+
+def run_LSTM_model(train, test, data_name, title=None, restore_checkpoint=False, load_weights_from_pretraining=False,
+                   max_len=50,
+                   gensim_embeddings="glove-twitter-100"):
     if title is None:
         title = time.strftime("%Y%m%d-%H%M%S")
 
     print("loading embedding vectors")
-    glove_vectors = gensim.downloader.load('glove-twitter-100')
-    embedding_weights = glove_vectors.vectors
+    vocab, embedding_weights = load_and_cache_embeddings(gensim_embeddings)
     print("done")
 
     test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train, data_name)
-    max_length_test = max([max([len(a) for a in test_feature_data.premises_words]),
-                           max([len(b) for b in test_feature_data.hypothesis_words])])
-    max_length_train = max([max([len(a) for a in train_feature_data.premises_words]),
-                            max([len(b) for b in train_feature_data.hypothesis_words])])
-    max_length = max([max_length_test, max_length_train])
+    # max_length_test = max([max([len(a) for a in test_feature_data.premises_words]),
+    #                        max([len(b) for b in test_feature_data.hypothesis_words])])
+    # max_length_train = max([max([len(a) for a in train_feature_data.premises_words]),
+    #                         max([len(b) for b in train_feature_data.hypothesis_words])])
+    # max_len = max([max_length_test, max_length_train])
 
     X_train = [
-        encode_strings_with_dict(train_feature_data.hypothesis_words.values, glove_vectors.vocab, max_length),
-        encode_strings_with_dict(train_feature_data.premises_words.values, glove_vectors.vocab, max_length)
+        encode_strings_with_dict(train_feature_data.hypothesis_words.values, vocab, max_len),
+        encode_strings_with_dict(train_feature_data.premises_words.values, vocab, max_len)
     ]
-    Y_train = tf.one_hot(train.label.values, 3)
+    Y_train = train.label.values
 
     X_test = [
-        encode_strings_with_dict(test_feature_data.hypothesis_words.values, glove_vectors.vocab, max_length),
-        encode_strings_with_dict(test_feature_data.premises_words.values, glove_vectors.vocab, max_length)
+        encode_strings_with_dict(test_feature_data.hypothesis_words.values, vocab, max_len),
+        encode_strings_with_dict(test_feature_data.premises_words.values, vocab, max_len)
     ]
-    Y_test = tf.one_hot(test.label.values, 3)
+    Y_test = test.label.values
 
     batch_size = 32
     model_name = "lstm_classifier"
@@ -204,18 +282,18 @@ def run_LSTM_model(train, test, data_name, title=None, restore_checkpoint=False,
         monitor='val_loss', patience=5, restore_best_weights=True
     )
     log_directory = get_log_directory(model_name, title)
-    model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_length)
+    model = get_prepared_LSTM_model(embedding_weights, log_directory, max_len=max_len)
 
     if load_weights_from_pretraining:
         pretrain_log_directory = get_log_directory(model_name, title, True)
         load_final_weights(model, pretrain_log_directory)
 
     model = train_model(X_train, Y_train,
-                                     model=model,
-                                     log_directory=log_directory,
-                                     batch_size=batch_size,
-                                     epochs=100,
-                                     additional_callbacks=[early_stopping],
-                                     restore_checkpoint=restore_checkpoint)
+                        model=model,
+                        log_directory=log_directory,
+                        batch_size=batch_size,
+                        epochs=100,
+                        additional_callbacks=[early_stopping],
+                        restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)
     print("done")

@@ -119,7 +119,7 @@ class EmbeddingClassifier(HyperModel):
                                outputs=[output],
                                name=self.name)
 
-        model.compile(loss='categorical_crossentropy',
+        model.compile(loss='sparse_categorical_crossentropy',
                       optimizer='adam',
                       metrics=['accuracy'])
 
@@ -147,7 +147,7 @@ def get_prepared_embeddings_model(log_dir):
 
     model.compile(
         optimizer='adam',
-        loss='categorical_crossentropy',
+        loss='sparse_categorical_crossentropy',
         metrics=['accuracy'],
     )
     return model
@@ -162,7 +162,7 @@ def pretrain_word_embedding_model(title=None, restore_checkpoint=False):
     hypothesis_embeddings_training, premises_embeddings_training = sum_embeddings(pretrain_feature_data)
 
     X_train = [np.array(hypothesis_embeddings_training), np.array(premises_embeddings_training)]
-    Y_train = tf.one_hot(pretrain_data.label.values, 3)
+    Y_train = np.array(pretrain_data.label.values, dtype='int32')
 
     model_name = "embedded_classifier"
     batch_size = 32
@@ -194,9 +194,9 @@ def run_word_embedding_model(train, test, data_name, title=None, restore_checkpo
     hypothesis_embeddings_training, premises_embeddings_training = sum_embeddings(train_feature_data)
 
     X_train = [np.array(hypothesis_embeddings_training), np.array(premises_embeddings_training)]
-    Y_train = tf.one_hot(train.label.values, 3)
+    Y_train = train.label.values
     X_test = [np.array(hypothesis_embeddings_test), np.array(premises_embeddings_test)]
-    Y_test = tf.one_hot(test.label.values, 3)
+    Y_test = test.label.values
 
     model_name = "embedded_classifier"
     batch_size = 32
@@ -214,7 +214,7 @@ def run_word_embedding_model(train, test, data_name, title=None, restore_checkpo
                                      model=model,
                                      log_directory=log_directory,
                                      batch_size=batch_size,
-                                     epochs=100,
+                                     epochs=40,
                                      additional_callbacks=[early_stopping],
                                      restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)
@@ -248,12 +248,14 @@ def run_word_embedding_model(train, test, data_name, title=None, restore_checkpo
 #     print("done")
 
 
-def run_manual_feature_model(train, test, data_name):
+def run_manual_feature_model(train, test, data_name, title=None):
+    if title is None:
+        title = time.strftime("%Y%m%d-%H%M%S")
     test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train, data_name)
     mlp_classifier = MLPClassifier(random_state=1, hidden_layer_sizes=(20, 20), max_iter=2000, verbose=True,
-                                   early_stopping=True, n_iter_no_change=8)
-    random_forest = RandomForestClassifier()
-    logreg = LogisticRegression(max_iter=2000, tol=1e-4, verbose=2)
+                                   early_stopping=True, n_iter_no_change=5)
+    # random_forest = RandomForestClassifier()
+    # logreg = LogisticRegression(max_iter=2000, tol=1e-4, verbose=2)
 
     pipeline_hypothesis_only = Pipeline(
         [
@@ -262,19 +264,31 @@ def run_manual_feature_model(train, test, data_name):
             ('classifier', mlp_classifier)
         ])
 
-    mlp_classifier_big = MLPClassifier(random_state=1, hidden_layer_sizes=(8, 4), max_iter=2000, verbose=True,
-                                       early_stopping=True, n_iter_no_change=8)
-    pipeline_hypothesis_and_premise = Pipeline(
-        [
-            ('transformer', BothSentencesTransformer()),
-            ('vectorizer', CountVectorizer()),
-            ('classifier', mlp_classifier_big)
-        ]
-    )
+    # mlp_classifier_big = MLPClassifier(random_state=1, hidden_layer_sizes=(8, 4), max_iter=2000, verbose=True,
+    #                                    early_stopping=True, n_iter_no_change=4)
+    # pipeline_hypothesis_and_premise = Pipeline(
+    #     [
+    #         ('transformer', BothSentencesTransformer()),
+    #         ('vectorizer', CountVectorizer()),
+    #         ('classifier', mlp_classifier_big)
+    #     ]
+    # )
     pipeline = pipeline_hypothesis_only
 
     pipeline.fit(train_feature_data, train_feature_data['label'])
     y_pred = pipeline.predict(test_feature_data)
-    plot_confusion_matrix(pipeline, test_feature_data, test_feature_data['label'])
+
+    model_name = "manual_feature_classifier"
+    log_dir = get_log_directory(model_name, title, True)
+
+    cnf_matrix = confusion_matrix(test_feature_data.label.values, y_pred)
+    plt.figure()
+    custom_plot_confusion_matrix(cnf_matrix, classes=[0, 1, 2],
+                                 title='Confusion matrix')
+    plt.savefig(log_dir + "/confusion_matrix.png")
     plt.show()
-    print(classification_report(test_feature_data['label'], y_pred))
+
+    class_report = classification_report(test_feature_data.label.values, y_pred)
+    with open(log_dir + '/classification_report.txt', 'w') as file:
+        file.write(class_report)
+    print(class_report)

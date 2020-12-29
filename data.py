@@ -1,6 +1,7 @@
 import os
 
 import numpy as np
+import pyarrow
 from google_trans_new import google_translator
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -55,7 +56,8 @@ def calculate_embeddings_and_pos_tag(data, cache_file):
         else:
             raise NotImplementedError()
         print("Loaded embeddings and pos tags from cache file: ", cache_file)
-    except FileNotFoundError:
+
+    except FileNotFoundError or pyarrow.ArrowIOError:
         print("cache file ", cache_file, "not found, calculating embeddings and pos tags...")
         print("loading spacy model...")
         nlp = spacy.load('en_core_web_lg')

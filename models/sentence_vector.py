@@ -102,12 +102,17 @@ class LSTMClassifier(HyperModel):
 def get_prepared_LSTM_model(embedding_weights, log_dir, max_len):
     hp = kt.HyperParameters()
     parameters = [
-        hp.Fixed("lstm_units", 64),
-        hp.Fixed("lstm_dropout", 0.05),
-        hp.Fixed("concat_hidden_layer_num_layers", 2),
+        hp.Fixed("lstm_units", 65),
+        hp.Fixed("lstm_dropout", 0.1),
+
+        hp.Fixed("concat_hidden_layer_num_layers", 0),
         hp.Fixed("concat_hidden_layer_neurons", 128),
-        hp.Fixed("separate_hidden_layer_neurons", 128),
-        hp.Fixed("separate_hidden_layer_num_layers", 1),
+
+        hp.Fixed("separate_hidden_layer_num_layers", 2),
+        hp.Fixed("separate_hidden_layer_neurons", 32),
+
+        hp.Fixed("final_hidden_layer_num_layers", 1),
+        hp.Fixed("final_hidden_layer_neurons", 128),
     ]
 
     classifier = LSTMClassifier(embedding_weights, log_dir, sentence_length=max_len)

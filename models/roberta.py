@@ -1,6 +1,7 @@
 import time
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, TFAutoModel, TFXLMRobertaModel
+from transformers import AutoTokenizer, AutoModelForSequenceClassification, TFAutoModel, TFXLMRobertaModel, \
+    TFRobertaModel
 import tensorflow as tf
 
 from models.util import *
@@ -35,7 +36,10 @@ def pretrain_roberta_model(model_name="jplu/tf-xlm-roberta-base", max_len=50, ma
 
 
 def get_roberta_model(model_name, max_len, log_directory, inputs, max_pool):
-    roberta_model = TFXLMRobertaModel.from_pretrained(model_name)
+    if "xlm" in model_name:
+        roberta_model = TFXLMRobertaModel.from_pretrained(model_name)
+    else:
+        roberta_model = TFRobertaModel.from_pretrained(model_name)
     layer_inputs = []
     for input in inputs:
         layer_inputs.append(tf.keras.Input(shape=(max_len,), dtype=tf.int32, name=input))

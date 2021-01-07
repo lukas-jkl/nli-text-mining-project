@@ -40,6 +40,7 @@ def custom_plot_confusion_matrix(cm, classes,
                  color="white" if cm[i, j] > thresh else "black")
 
     plt.tight_layout()
+    plt.gcf().subplots_adjust(bottom=0.15)
     plt.ylabel('True label')
     plt.xlabel('Predicted label')
 
@@ -47,7 +48,8 @@ def custom_plot_confusion_matrix(cm, classes,
 def get_pretrain_data(number_samples=100000):
     # Prepare data
     pretrain_data = pd.read_json('./data/pretrain/snli_1.0_train.jsonl', lines=True)
-    pretrain_data = pretrain_data[:number_samples]
+    if number_samples:
+        pretrain_data = pretrain_data[:number_samples]
     pretrain_data = pretrain_data[['sentence1', 'sentence2', 'gold_label']].rename(
         columns={'sentence1': 'premise', 'sentence2': 'hypothesis', 'gold_label': 'label'})
     pretrain_data['id'] = list(range(len(pretrain_data)))
@@ -111,17 +113,22 @@ def load_final_weights(model, log_directory):
 def train_model(X_train, Y_train, model, log_directory, batch_size, epochs,
                 additional_callbacks, restore_checkpoint):
     hist_callback, cp_callback = prepare_log_callbacks(batch_size, log_directory)
-    callbacks = additional_callbacks + [hist_callback, cp_callback]
+    callbacks = additional_callbacks + [hist_callback]#, cp_callback]
 
     if restore_checkpoint:
         print("restoring weights from checkpoint: ", cp_callback.filepath)
         model.load_weights(cp_callback.filepath)
         print("done")
 
+    if len(additional_callbacks) > 0:
+        validation_split = 0.2
+    else:
+        validation_split = 0
+
     history = model.fit(X_train, Y_train,
                         epochs=epochs,
                         verbose=1,
-                        validation_split=0.2,
+                        validation_split=validation_split,
                         callbacks=callbacks,
                         batch_size=batch_size)
 

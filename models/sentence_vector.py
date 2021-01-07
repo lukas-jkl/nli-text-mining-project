@@ -1,11 +1,9 @@
-import os
-import time
-import zipfile
 import pickle as pkl
+import time
+
 import gensim
 import gensim.downloader
 import kerastuner as kt
-import wget
 from kerastuner import HyperModel
 
 from data import calculate_embeddings_and_pos_tag, test_training_calculate_embeddings_and_pos_tags
@@ -101,7 +99,7 @@ class LSTMClassifier(HyperModel):
 
 def get_prepared_LSTM_model(embedding_weights, log_dir, max_len):
     hp = kt.HyperParameters()
-    parameters = [
+    parameters_1 = [
         hp.Fixed("lstm_units", 65),
         hp.Fixed("lstm_dropout", 0.1),
 
@@ -113,6 +111,21 @@ def get_prepared_LSTM_model(embedding_weights, log_dir, max_len):
 
         hp.Fixed("final_hidden_layer_num_layers", 1),
         hp.Fixed("final_hidden_layer_neurons", 128),
+    ]
+
+    hp_2 = kt.HyperParameters()
+    parameters_1 = [
+        hp_2.Fixed("lstm_units", 65),
+        hp_2.Fixed("lstm_dropout", 0.1),
+
+        hp_2.Fixed("concat_hidden_layer_num_layers", 0),
+        hp_2.Fixed("concat_hidden_layer_neurons", 128),
+
+        hp_2.Fixed("separate_hidden_layer_num_layers", 0),
+        hp_2.Fixed("separate_hidden_layer_neurons", 32),
+
+        hp_2.Fixed("final_hidden_layer_num_layers", 1),
+        hp_2.Fixed("final_hidden_layer_neurons", 128),
     ]
 
     classifier = LSTMClassifier(embedding_weights, log_dir, sentence_length=max_len)
@@ -196,11 +209,7 @@ def pretrain_LSTM_model(title=None, restore_checkpoint=False, gensim_embeddings=
 
     # Prepare data
     pretrain_data = get_pretrain_data()
-
     pretrain_feature_data = calculate_embeddings_and_pos_tag(pretrain_data, './cache/pretrain_features.feather')
-
-    # max_length = max([max([len(a) for a in pretrain_feature_data.premises_words]),
-    #                   max([len(b) for b in pretrain_feature_data.hypothesis_words])])
 
     print("loading embedding vectors...")
     vocab, embedding_weights = load_and_cache_embeddings(gensim_embeddings)
@@ -263,11 +272,6 @@ def run_LSTM_model(train, test, data_name, title=None, restore_checkpoint=False,
     print("done")
 
     test_feature_data, train_feature_data = test_training_calculate_embeddings_and_pos_tags(test, train, data_name)
-    # max_length_test = max([max([len(a) for a in test_feature_data.premises_words]),
-    #                        max([len(b) for b in test_feature_data.hypothesis_words])])
-    # max_length_train = max([max([len(a) for a in train_feature_data.premises_words]),
-    #                         max([len(b) for b in train_feature_data.hypothesis_words])])
-    # max_len = max([max_length_test, max_length_train])
 
     X_train = [
         encode_strings_with_dict(train_feature_data.hypothesis_words.values, vocab, max_len),

@@ -1,5 +1,8 @@
+import time
+
 import data
 import configurations
+import models.feature_based
 
 
 def run_bert_maxlen_maxpool_experiments():
@@ -80,3 +83,19 @@ def run_multi_lingual_model_experiments():
                                               data_name=data_name,
                                               title_prefix=title_prefix,
                                               max_epochs=max_epochs)
+
+
+def run_embedding_model_experiments():
+    time_date = time.strftime("%Y-%m-%d_%H_")
+    title = time_date + "translated_with_pretrain"
+    data_name, train_translated, test_translated = data.get_translated_labeled_data()
+
+    print("Training with pretrain")
+    models.feature_based.pretrain_word_embedding_model(title=title)
+    models.feature_based.run_word_embedding_model(train_translated, test_translated, data_name, title=title,
+                                                  load_weights_from_pretraining=True)
+
+    print("Training without pretrain")
+    title = time_date + "translated_no_pretrain"
+    models.feature_based.run_word_embedding_model(train_translated, test_translated, data_name, title=title,
+                                                  load_weights_from_pretraining=False)

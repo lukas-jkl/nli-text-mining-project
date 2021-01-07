@@ -1,11 +1,10 @@
 import time
 
-import data
-import models.random_guessing
-import models.feature_based
-import models.sentence_vector
 import models.bert
+import models.feature_based
+import models.random_guessing
 import models.roberta
+import models.sentence_vector
 
 
 def get_config_title(model_name, max_pool, max_len, pretrain_snli, data_name, title_prefix):

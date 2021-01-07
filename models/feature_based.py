@@ -3,14 +3,9 @@ import time
 import kerastuner as kt
 from kerastuner import HyperModel
 from sklearn.base import BaseEstimator, TransformerMixin
-from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.metrics import plot_confusion_matrix
 from sklearn.neural_network import MLPClassifier
 from sklearn.pipeline import Pipeline
-from datetime import datetime
-
 
 from data import calculate_embeddings_and_pos_tag, test_training_calculate_embeddings_and_pos_tags
 from models.util import *
@@ -218,34 +213,6 @@ def run_word_embedding_model(train, test, data_name, title=None, restore_checkpo
                                      additional_callbacks=[early_stopping],
                                      restore_checkpoint=restore_checkpoint)
     evaluate_model(model, X_test, Y_test, log_directory)
-    print("done")
-
-#TODO: fix and rewrite if needed
-# def hyperparameter_search(X_train, Y_train):
-#     log_directory = "logs/embedded_classifier/"
-#
-#     classifier = EmbeddingClassifier()
-#     tuner = kt.Hyperband(classifier,
-#                          objective='val_accuracy',
-#                          max_epochs=50,
-#                          factor=2,
-#                          directory=log_directory + 'hyperparams',
-#                          )
-#
-#     search_title = "try"
-#     tensorboard_log_dir = log_directory + "tensorboard_logs/" + search_title
-#     pathlib.Path(tensorboard_log_dir).mkdir(parents=True, exist_ok=True)
-#     hist_callback = tf.keras.callbacks.TensorBoard(
-#         log_dir=tensorboard_log_dir,
-#         histogram_freq=1,
-#         write_images=False,
-#         write_graph=True)
-#     stop_callback = tf.keras.callbacks.EarlyStopping(
-#         monitor='val_accuracy', patience=3)
-#
-#     tuner.search(X_train, Y_train, validation_split=0.2, callbacks=[hist_callback, stop_callback])
-#     tuner.results_summary(5)
-#     print("done")
 
 
 def run_manual_feature_model(train, test, data_name, title=None):
@@ -264,15 +231,13 @@ def run_manual_feature_model(train, test, data_name, title=None):
             ('classifier', mlp_classifier)
         ])
 
-    # mlp_classifier_big = MLPClassifier(random_state=1, hidden_layer_sizes=(8, 4), max_iter=2000, verbose=True,
-    #                                    early_stopping=True, n_iter_no_change=4)
-    # pipeline_hypothesis_and_premise = Pipeline(
-    #     [
-    #         ('transformer', BothSentencesTransformer()),
-    #         ('vectorizer', CountVectorizer()),
-    #         ('classifier', mlp_classifier_big)
-    #     ]
-    # )
+    pipeline_hypothesis_and_premise = Pipeline(
+        [
+            ('transformer', BothSentencesTransformer()),
+            ('vectorizer', CountVectorizer()),
+            ('classifier', mlp_classifier)
+        ]
+    )
     pipeline = pipeline_hypothesis_only
 
     pipeline.fit(train_feature_data, train_feature_data['label'])

@@ -6,6 +6,8 @@ from google_trans_new import google_translator
 import pandas as pd
 import matplotlib.pyplot as plt
 import spacy
+from transformers import AutoTokenizer
+import seaborn as sns
 
 
 def load_data():
@@ -14,15 +16,35 @@ def load_data():
     return training_data, unlabeled_test_data
 
 
-def explore_data(data, name):
+def plot_label_histogram():
+    data, _ = load_data()
+    sns.set_palette("deep")
     data['label'] = data['label'].replace([0], 'entailment')
     data['label'] = data['label'].replace([1], 'neutral')
     data['label'] = data['label'].replace([2], 'contradiction')
     data[['language', 'label']].groupby(by='label')['language'].value_counts() \
         .unstack(0).plot(kind='bar')
-    plt.title(name)
+    plt.gcf().subplots_adjust(bottom=0.25)
     plt.xlabel('Language')
     plt.ylabel('Number of samples')
+    plt.savefig('plots/label_hist.png')
+    plt.show()
+
+
+def plot_sentence_length_histogram():
+    labeled_data, _ = load_data()
+    tokenizer = AutoTokenizer.from_pretrained('jplu/tf-xlm-roberta-base', padding=True, use_fast=True)
+    premise_tokens = [tokenizer.tokenize(a) for a in labeled_data.premise.values.tolist()]
+    hypothesis_tokens = [tokenizer.tokenize(a) for a in labeled_data.hypothesis.values.tolist()]
+    premise_sentence_lengths = [len(a) for a in premise_tokens]
+    hypothesis_sentence_lengths = [len(a) for a in hypothesis_tokens]
+    sentence_lengths = {'premises': premise_sentence_lengths, 'hypothesis': hypothesis_sentence_lengths}
+
+    # Plot
+    sns.set_palette("deep")
+    ax = sns.histplot(sentence_lengths, bins=120, kde=False, element='step')
+    ax.set(xlabel="Number of tokens in sentence", ylabel="Number of samples")
+    plt.savefig('plots/length_hist.png')
     plt.show()
 
 
@@ -148,5 +170,5 @@ def split_test_training(data):
 
 
 if __name__ == '__main__':
-    data, unlabeled_data = load_data()
-    explore_data(data, 'Data')
+    plot_label_histogram()
+    plot_sentence_length_histogram()

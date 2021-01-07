@@ -22,3 +22,4 @@ sentencepiece>=0.1.94
 google_trans_new>=1.1.9
 pyarrow>=2.0.0
 seaborn
+tensorflow_datasets

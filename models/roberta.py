@@ -1,11 +1,10 @@
 import time
 
-from transformers import AutoTokenizer, AutoModelForSequenceClassification, TFAutoModel, TFXLMRobertaModel, \
-    TFRobertaModel, TFAutoModelForSequenceClassification
-import tensorflow as tf
+import tensorflow_datasets as tfds
+from transformers import AutoTokenizer, TFXLMRobertaModel, \
+    TFRobertaModel
 
 from models.util import *
-import tensorflow_datasets as tfds
 
 
 def full_pretrain_roberta_model(model_name="roberta-base", max_len=50, max_pool=False, title=None,
@@ -19,7 +18,7 @@ def full_pretrain_roberta_model(model_name="roberta-base", max_len=50, max_pool=
     tokenizer = AutoTokenizer.from_pretrained(model_name, padding=True, use_fast=True)
     X_train, Y_train = prepare_transformer_pretrain_data(pretrain_data, tokenizer, max_len)
 
-    # Pretrain snli
+    # prepare data
     ds = tfds.load('multi_nli', split='train', shuffle_files=True)  # .take(1000)
     labels = []
     input_ids = []
@@ -27,8 +26,8 @@ def full_pretrain_roberta_model(model_name="roberta-base", max_len=50, max_pool=
     i = 0
     for element in ds.as_numpy_iterator():
         i += 1
-        if i % 1000 == 0:
-            print(i)
+        if i % 10000 == 0:
+            print("Preprocessing sample: ", i)
         prepared_data = tokenizer(str(element['hypothesis']), str(element['premise']),
                                   max_length=max_len, truncation=True, padding="max_length").data
         input_ids.append(prepared_data['input_ids'])
@@ -52,6 +51,7 @@ def full_pretrain_roberta_model(model_name="roberta-base", max_len=50, max_pool=
                         restore_checkpoint=restore_checkpoint)
 
     final_weights_path = save_final_weights(model, log_directory)
+    return final_weights_path
 
 
 def pretrain_roberta_model(model_name="jplu/tf-xlm-roberta-base", max_len=50, max_pool=False, title=None,
@@ -85,30 +85,30 @@ def pretrain_roberta_model(model_name="jplu/tf-xlm-roberta-base", max_len=50, ma
 
 def get_roberta_model(model_name, max_len, log_directory, inputs, max_pool, dropout=None):
     if "xlm" in model_name:
-       roberta_model = TFXLMRobertaModel.from_pretrained(model_name)
+        roberta_model = TFXLMRobertaModel.from_pretrained(model_name)
     else:
-       roberta_model = TFRobertaModel.from_pretrained(model_name)
+        roberta_model = TFRobertaModel.from_pretrained(model_name)
     layer_inputs = []
 
     for input in inputs:
-       layer_inputs.append(tf.keras.Input(shape=(max_len,), dtype=tf.int32, name=input))
+        layer_inputs.append(tf.keras.Input(shape=(max_len,), dtype=tf.int32, name=input))
 
     roberta_layer = roberta_model(layer_inputs)[0]
     if not max_pool:
-       roberta_layer = roberta_layer[:, 0, :]
-       if dropout:
-           roberta_layer = tf.keras.layers.Dropout(roberta_layer)
-       output = tf.keras.layers.Dense(3, activation='softmax')(roberta_layer)
+        roberta_layer = roberta_layer[:, 0, :]
+        if dropout:
+            roberta_layer = tf.keras.layers.Dropout(roberta_layer)
+        output = tf.keras.layers.Dense(3, activation='softmax')(roberta_layer)
     else:
-       hidden_layer = tf.keras.layers.GlobalAveragePooling1D()(roberta_layer)
-       hidden_layer = tf.keras.layers.Dropout(0.25)(hidden_layer)
-       hidden_layer = tf.keras.layers.Dense(32, activation='relu')(hidden_layer)
-       hidden_layer = tf.keras.layers.Dense(16, activation='relu')(hidden_layer)
-       output = tf.keras.layers.Dense(3, activation='softmax')(hidden_layer)
+        hidden_layer = tf.keras.layers.GlobalAveragePooling1D()(roberta_layer)
+        hidden_layer = tf.keras.layers.Dropout(0.25)(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(32, activation='relu')(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(16, activation='relu')(hidden_layer)
+        output = tf.keras.layers.Dense(3, activation='softmax')(hidden_layer)
 
     model = tf.keras.Model(
-       inputs=layer_inputs,
-       outputs=[output])
+        inputs=layer_inputs,
+        outputs=[output])
     model.compile(tf.keras.optimizers.Adam(lr=1e-5), loss='sparse_categorical_crossentropy', metrics=['accuracy'])
     model.summary()
 
@@ -120,20 +120,19 @@ def get_roberta_model(model_name, max_len, log_directory, inputs, max_pool, drop
     return model
 
 
-def inference(test, model_name, max_len, title, dropout=None, max_pool=False):
+def evaluate_roberta_model(test, model_name, max_len, log_directory, dropout=None, max_pool=False):
     tokenizer = AutoTokenizer.from_pretrained(model_name, padding=True, use_fast=True)
     X = encode_transformer_input(test, tokenizer, max_len).data
     X_train, X_test = dict(), dict()
     for key in X.keys():
         X_test[key] = np.array(X[key])
 
-    log_directory = get_log_directory(model_name, title)
     model = get_roberta_model(model_name, max_len, log_directory, list(X_test.keys()), max_pool=max_pool,
                               dropout=dropout)
     model.load_weights(log_directory + "final_model/weights")
     Y_pred = model.predict(X_test)
     print(model.evaluate(X_test, test.label.values))
-    print("done")
+    return Y_pred
 
 
 def run_roberta_model(train, test, model_name="jplu/tf-xlm-roberta-base", max_len=50, max_pool=False, title=None,
@@ -146,7 +145,7 @@ def run_roberta_model(train, test, model_name="jplu/tf-xlm-roberta-base", max_le
     X_train, Y_train, X_test, Y_test = prepare_transformer_training_test_data(train, test, tokenizer, max_len)
 
     batch_size = 32
-    early_stopping = tf.keras.callbacks.EarlyStopping(
+    early_stopping_callback = tf.keras.callbacks.EarlyStopping(
         monitor='val_loss', patience=2, restore_best_weights=True
     )
 
@@ -159,7 +158,7 @@ def run_roberta_model(train, test, model_name="jplu/tf-xlm-roberta-base", max_le
         load_final_weights(model, pretrain_log_directory)
 
     if early_stopping:
-        callbacks = [early_stopping]
+        callbacks = [early_stopping_callback]
     else:
         callbacks = []
 

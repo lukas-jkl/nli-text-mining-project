@@ -123,7 +123,7 @@ class EmbeddingClassifier(HyperModel):
 
         model.summary()
         tf.keras.utils.plot_model(
-            model, to_file=self.log_dir + 'embedded_model.png', show_shapes=False, show_layer_names=True,
+            model, to_file=self.log_dir + 'embedded_model.png', show_shapes=False, show_layer_names=False,
             rankdir='TB', expand_nested=False, dpi=96
         )
         return model

@@ -1,8 +1,11 @@
 import time
+import numpy as np
+from sklearn.metrics import confusion_matrix, classification_report
 
 import data
 import configurations
 import models.feature_based
+import models.roberta
 
 
 def run_bert_maxlen_maxpool_experiments():
@@ -99,3 +102,38 @@ def run_embedding_model_experiments():
     title = time_date + "translated_no_pretrain"
     models.feature_based.run_word_embedding_model(train_translated, test_translated, data_name, title=title,
                                                   load_weights_from_pretraining=False)
+
+
+def test_models_translated_non_translated_data():
+    LOG_DIR = "D:/text_mining_project_logs"
+    _, _, test_translated = data.get_translated_labeled_data()
+    _, _, test_multilang = data.get_multilang_labeled_data()
+
+    log_dir_roberta_base = LOG_DIR + "/" + "roberta-base" + "/training/" + "roberta_final_training" + "/"
+    log_dir_roberta_distilled = LOG_DIR + "/" + "distilroberta-base" + "/training/" + "2021-01-02_08_roberta_final_training" + "/"
+    log_dir_ml_roberta = LOG_DIR + "/" + "tf-xlm-roberta-base" + "/training/" + "roberta_final_training" + "/"
+
+    # English roberta models
+    for model_name, log_dir, eval_data in zip(["jplu/tf-xlm-roberta-base", "roberta-base", "distilroberta-base"],
+                                              [log_dir_ml_roberta, log_dir_roberta_distilled, log_dir_roberta_base],
+                                              [test_multilang, test_translated, test_translated, ]):
+        predictions = models.roberta.evaluate_roberta_model(eval_data,
+                                                            model_name=model_name,
+                                                            max_len=100,
+                                                            log_directory=log_dir,
+                                                            dropout=None,
+                                                            max_pool=False)
+
+        y_true_en = eval_data[eval_data.lang_abv == "en"].label.values
+        y_pred_en = np.argmax(predictions, 1)[eval_data.lang_abv == "en"]
+        class_report_en = classification_report(y_true_en, y_pred_en)
+        with open(log_dir + '/classification_report_en.txt', 'w') as file:
+            file.write(class_report_en)
+
+        y_true_translated = eval_data[eval_data.lang_abv != "en"].label.values
+        y_pred_translated = np.argmax(predictions, 1)[eval_data.lang_abv != "en"]
+        class_report_translated = classification_report(y_true_translated, y_pred_translated)
+        with open(log_dir + '/classification_report_non_en.txt', 'w') as file:
+            file.write(class_report_translated)
+
+    print("done")

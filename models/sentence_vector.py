@@ -91,8 +91,8 @@ class LSTMClassifier(HyperModel):
             f.write(json.dumps(hp.values))
 
         tf.keras.utils.plot_model(
-            model, to_file=self.log_dir + 'lstm_model.png', show_shapes=False, show_layer_names=True,
-            rankdir='TB', expand_nested=False, dpi=96
+            model, to_file=self.log_dir + 'lstm_model.png', show_shapes=True, show_layer_names=False,
+            rankdir='TB', expand_nested=False, dpi=200
         )
         return model
 
@@ -114,7 +114,7 @@ def get_prepared_LSTM_model(embedding_weights, log_dir, max_len):
     ]
 
     hp_2 = kt.HyperParameters()
-    parameters_1 = [
+    parameters_2 = [
         hp_2.Fixed("lstm_units", 65),
         hp_2.Fixed("lstm_dropout", 0.1),
 

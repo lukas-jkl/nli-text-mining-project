@@ -1,7 +1,9 @@
 import json
 
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
 import numpy as np
+import pandas as pd
 import seaborn as sns
 
 DATA_DIR = "D:/text_mining_project_logs/"
@@ -49,7 +51,6 @@ roberta_final_model = "roberta_final_training"
 distilroberta_final_model_name = "distilroberta-base"
 distilroberta_final_model_pretrain = "2021-01-02_08_roberta_final_training"
 distilroberta_final_model = "2021-01-02_08_roberta_final_training"
-
 
 
 def get_pretrain_dir(title, model_name):
@@ -280,7 +281,7 @@ def compare_models_max_validation(model_names, titles, plot_names, file_path):
     axes = plt.gca()
     axes.get_legend().remove()
     axes.set_xlim([0, 1])
-    plt.xlabel('Maximal validation accuracy')
+    plt.xlabel('Validation accuracy')
     plt.savefig(file_path)
     plt.show()
     print("done")
@@ -346,26 +347,27 @@ def compare_transformer_models():
         multilingual_roberta
     ]
     plot_names = [
-        "BERT with pretrain",
+        "BERT pretrain 100.000",
         "BERT no pretrain",
-        "DistilBERT with pretrain",
+        "DistilBERT pretrain 100.000",
         "DistilBERT no pretrain",
-        "RoBERTa with pretrain",
+        "RoBERTa pretrain 100.000",
         "RoBERTa no pretrain",
-        "DistilRoBERTa with pretrain",
+        "DistilRoBERTa pretrain 100.000",
         "DistilRoBERTa no pretrain",
-        "Multilingual BERT with pretrain",
-        "Multilingual BERT no pretrain",
-        "Multilingual RoBERTa with pretrain",
-        "Multilingual RoBERTa no pretrain",
+        "ml-BERT pretrain 100.000",
+        "ml-BERT no pretrain",
+        "ml-RoBERTa pretrain 100.000",
+        "ml-RoBERTa no pretrain",
     ]
     compare_models_max_validation(model_names, titles, plot_names, DATA_DIR + "bert_roberta_comparison.png")
 
 
 def plot_model_performance_comparison():
     test_accuracy = {
+        "manual feature": 0.46,
         "word embedding": 0.48,
-        "LSTM model": 0.5,
+        "LSTM": 0.5,
         "DistilRoBERTa": 0.73,
         "RoBERTa": 0.78,
         "ml-RoBERTa": 0.73
@@ -373,19 +375,23 @@ def plot_model_performance_comparison():
     test_accuracy_full_pretrain = {
         "DistilRoBERTa": 0.8,
         "RoBERTa": 0.83,
+        "ml-RoBERTa": 0.78
     }
     model_size_full_pretrain_kb = {
         "DistilRoBERTa": 958000,
         "RoBERTa": 1456000,
+        "ml-RoBERTa": 3254000
     }
     model_size_kb = {
+        "manual feature": 200,
         "word embedding": 6000,
-        "lstm model": 934000,
+        "LSTM": 934000,
         "DistilRoBERTa": 958000,
         "RoBERTa": 1456000,
         "ml-RoBERTa": 3254000
     }
     trainable_parameters = {
+        "manual feature": 200,
         "word embedding": 506000,
         "LSTM": 118155,  # 238,820,955 total
         "DistilRoBERTa": 82121000,
@@ -395,6 +401,7 @@ def plot_model_performance_comparison():
     trainable_parameters_full_pretrain = {
         "DistilRoBERTa": 82121000,
         "RoBERTa": 124648000,
+        "ml-RoBERTa": 278046000
     }
 
     # Plot model size KB
@@ -404,48 +411,56 @@ def plot_model_performance_comparison():
     for i, label in enumerate(test_accuracy.keys()):
         y = 0.007
         x = 50
-        if i % 2 == 0:
+        if i % 1 == 0:
             y = - 0.03
-        if i == 4:
+        if i == 1:
+            y += 0.05
             x -= 200
-            y -= 0.025
+        if i == 5 or i == 0:
+            x -= 200
+            y -= 0.015
         plt.annotate(label, (X[i] + x, Y[i] + y), color="royalblue")
-
     X = np.array(list(model_size_full_pretrain_kb.values())) / 1000
     Y = list(test_accuracy_full_pretrain.values())
     plt.scatter(X, Y, label="Full Pretrain", color="darkred")
-
     for i, label in enumerate(test_accuracy_full_pretrain.keys()):
         y = 0.012
         x = 550
         if i == 0:
             x += 300
-        print("here")
         plt.annotate(label, (X[i] - x, Y[i] + y), color='darkred')
-
-    plt.xlabel("Model size in MB")
+    random_guessing = 0.35
+    plt.axhline(y=random_guessing, color='g', linestyle='-')
+    plt.annotate("random guessing", (0, random_guessing - 0.035), color='g')
+    plt.xlabel("Model size in megabyte")
     plt.ylabel("Test Accuracy")
     plt.gcf().subplots_adjust(bottom=0.15)
     axes = plt.gca()
     axes.set_ylim([0, 1])
-    plt.legend()
+    plt.legend(loc=4)
     plt.savefig(DATA_DIR + "test_accuracy_vs_model_size.png")
     plt.show()
 
     # Plot model size Parameters
-    X = np.array(list(trainable_parameters.values()))
+    X = np.array(list(trainable_parameters.values())) / 1000000
     Y = list(test_accuracy.values())
     plt.scatter(X, Y, label="Pretrain 100,000", color="royalblue")
     for i, label in enumerate(test_accuracy.keys()):
         y = 0.007
         x = 5000000
-        if i % 2 == 0:
+        if i % 1 == 0:
             y = - 0.03
-        if i == 4:
+        if i == 2:
+            y += 0.03
+        if i == 1:
+            y += 0.01
+        if i == 0:
+            y -= 0.01
+        if i == 5:
             x -= 40000000
             y -= 0.025
-        plt.annotate(label, (X[i] + x, Y[i] + y), color="royalblue")
-    X = np.array(list(trainable_parameters_full_pretrain.values()))
+        plt.annotate(label, (X[i] + x / 1000000, Y[i] + y), color="royalblue")
+    X = np.array(list(trainable_parameters_full_pretrain.values())) / 1000000
     Y = list(test_accuracy_full_pretrain.values())
     plt.scatter(X, Y, label="Full Pretrain", color="darkred")
     for i, label in enumerate(test_accuracy_full_pretrain.keys()):
@@ -454,15 +469,18 @@ def plot_model_performance_comparison():
         if i == 0:
             y = 0.01
             x = 70000000
-        print("here")
-        plt.annotate(label, (X[i] - x, Y[i] + y), color='darkred')
-    plt.xlabel("Model size in trainable parameters")
+        plt.annotate(label, (X[i] - x / 1000000, Y[i] + y), color='darkred')
+
+    random_guessing = 0.35
+    plt.axhline(y=random_guessing, color='g', linestyle='-')
+    plt.annotate("random guessing", (0, random_guessing - 0.035), color='g')
+    plt.xlabel("Model size in million trainable parameters")
     plt.ylabel("Test Accuracy")
     # plt.xscale('log')
     plt.gcf().subplots_adjust(bottom=0.15)
     axes = plt.gca()
     axes.set_ylim([0, 1])
-    plt.legend()
+    plt.legend(loc=4)
     plt.savefig(DATA_DIR + "test_accuracy_vs_trainable_parameters.png")
     plt.show()
 
@@ -472,11 +490,34 @@ def plot_final_roberta():
     plot_history(model_name=distilroberta_final_model_name, title=distilroberta_final_model_pretrain)
 
 
+def plot_final_model_translated_vs_english():
+    index = ["DistilRoBERTa", "RoBERTa", "ml-RoBERTa"]
+    data = {
+        "test accuracy english": [0.82, 0.86, 0.84],
+        "test accuracy non-english translated": [0.77, 0.79, None],
+        "test accuracy non-english": [None, None, 0.72],
+    }
+    df = pd.DataFrame(data=data, index=index)
+
+    colors = ["royalblue", "darkgreen",
+              "mediumseagreen"]
+    cmap = ListedColormap(colors)
+    p = df.plot.barh(colormap=cmap)
+    p.containers[2][2].xy = p.containers[1][2].xy
+    axes = plt.gca()
+    axes.set_xlim([0, 1])
+    plt.legend(loc=4, bbox_to_anchor=(1.0, 1.0))
+    plt.tight_layout()
+    plt.savefig(DATA_DIR + "test_accuracy_english_vs_non_english.png")
+    plt.show()
+
+    pass
 
 
 if __name__ == '__main__':
     sns.set_theme(style="whitegrid")
     plot_model_performance_comparison()
+    plot_final_model_translated_vs_english()
     compare_transformer_models()
     plot_final_roberta()
     plot_multilingual_transformers()

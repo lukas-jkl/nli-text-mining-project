@@ -124,7 +124,7 @@ class EmbeddingClassifier(HyperModel):
         model.summary()
         tf.keras.utils.plot_model(
             model, to_file=self.log_dir + 'embedded_model.png', show_shapes=False, show_layer_names=False,
-            rankdir='TB', expand_nested=False, dpi=96
+            rankdir='TB', expand_nested=False, dpi=200
         )
         return model
 
@@ -132,10 +132,10 @@ class EmbeddingClassifier(HyperModel):
 def get_prepared_embeddings_model(log_dir):
     hp = kt.HyperParameters()
     parameters = [
-        hp.Fixed("separate_hidden_layer_neurons", 512),
+        hp.Fixed("separate_hidden_layer_neurons", 128),
         hp.Fixed("separate_hidden_layer_num_layers", 2),
-        hp.Fixed("concat_hidden_layer_neurons", 1024),
-        hp.Fixed("concat_hidden_layer_num_layers", 4)]
+        hp.Fixed("concat_hidden_layer_neurons", 512),
+        hp.Fixed("concat_hidden_layer_num_layers", 2)]
 
     classifier = EmbeddingClassifier(log_dir)
     model = classifier.build(hp)

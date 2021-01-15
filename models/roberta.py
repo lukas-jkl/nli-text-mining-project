@@ -97,14 +97,14 @@ def get_roberta_model(model_name, max_len, log_directory, inputs, max_pool, drop
     if not max_pool:
         roberta_layer = roberta_layer[:, 0, :]
         if dropout:
-            roberta_layer = tf.keras.layers.Dropout(roberta_layer)
+            roberta_layer = tf.keras.layers.Dropout(roberta_layer, name="dropout")
         output = tf.keras.layers.Dense(3, activation='softmax')(roberta_layer)
     else:
-        hidden_layer = tf.keras.layers.GlobalAveragePooling1D()(roberta_layer)
-        hidden_layer = tf.keras.layers.Dropout(0.25)(hidden_layer)
-        hidden_layer = tf.keras.layers.Dense(32, activation='relu')(hidden_layer)
-        hidden_layer = tf.keras.layers.Dense(16, activation='relu')(hidden_layer)
-        output = tf.keras.layers.Dense(3, activation='softmax')(hidden_layer)
+        hidden_layer = tf.keras.layers.GlobalAveragePooling1D(name="pooling")(roberta_layer)
+        hidden_layer = tf.keras.layers.Dropout(0.25, name="dropout")(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(32, activation='relu', name="dense_1")(hidden_layer)
+        hidden_layer = tf.keras.layers.Dense(16, activation='relu', name="dense_2")(hidden_layer)
+        output = tf.keras.layers.Dense(3, activation='softmax', name="final_dense")(hidden_layer)
 
     model = tf.keras.Model(
         inputs=layer_inputs,
@@ -114,7 +114,7 @@ def get_roberta_model(model_name, max_len, log_directory, inputs, max_pool, drop
 
     tf.keras.utils.plot_model(
         model, to_file=log_directory + "/roberta_model.png", show_shapes=False, show_layer_names=True,
-        rankdir='TB', expand_nested=False, dpi=96
+        rankdir='TB', expand_nested=False, dpi=200
     )
 
     return model

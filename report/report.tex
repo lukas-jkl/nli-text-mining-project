@@ -232,7 +232,7 @@ For this model we used the \textit{en\_core\_web\_lg} model from spaCy, which us
 \subsection{Sentence Vector Model (LSTM)} \label{sec:method_lstm}
 The next model we train is an LSTM model. Again we create it using Tensorflow. 
 For this model, we use embedding layers as part of the model. We initialize the embedding layers using the \textit{glove-twitter-100} vectors from Gensim and set them as not trainable to reduce the training time. The architecture is depicted in Figure~\ref{fig:lstm_model}.
-We try various architectures with a different number of layers before and after the LSTM layer with a different number of neurons and also try dropout regularization in the LSTM layer. For these experiments, we utilize the keras-tuner with the Hyperband approach. Again all Dense layers use the ReLu activation except for the final layer, which uses Softmax. The LSTM uses a Tanh activation.  The learning rate for Adam is set to $1\times10^{-3}$.
+We try various architectures with a different number of layers before and after the LSTM layer with a different number of neurons and also try dropout regularization in the LSTM layer. For these experiments, we utilize the keras-tuner with the Hyperband approach. Again all dense layers use the ReLu activation except for the final layer, which uses Softmax. The LSTM uses a Tanh activation.  The learning rate for Adam is set to $1\times10^{-3}$.
 
 \begin{figure}[h!]
   \begin{subfigure}[c]{0.35\textwidth}
@@ -254,12 +254,12 @@ We try various architectures with a different number of layers before and after 
 
 
 \subsection{Transformer Models} \label{sec:method_transformer}
-The final type of models we train are pretrained transformer models in different sizes. We obtain the models from the transformers library~\cite{transformers-wolf-etal-2020} We limit the input size to 50 to reduce the hardware requirements for training. This still captures the majority of our data as can be seen in Figure~\ref{fig:sentence_length}. We use BERT and RoBERTa models by attaching additional layers. The two architectures are depicted in Figure~\ref{fig:transformer_models}. We build one architecture by only adding a single Dense layer with Softmax activation function and three outputs (Figure~\ref{fig:roberta_model}). Additionally, we create an architecture that uses a Pooling layer followed by a Dropout layer with dropout set to 0.1 and two Dense layers with ReLu activation of size 64 and 32 respectably. The final layer is again a Softmax and has size three.  The learning rate for Adam is set to $1\times10^{-5}$.
+The final type of models we train are pretrained transformer models in different sizes. We obtain the models from the transformers library~\cite{transformers-wolf-etal-2020} We limit the input size to 50 to reduce the hardware requirements for training. This still captures the majority of our data as can be seen in Figure~\ref{fig:sentence_length}. We use BERT and RoBERTa models by attaching additional layers. The two architectures are depicted in Figure~\ref{fig:transformer_models}. We build one architecture by only adding a single dense layer with Softmax activation function and three outputs (Figure~\ref{fig:roberta_model}). Additionally, we create an architecture that uses a Pooling layer followed by a Dropout layer with dropout set to 0.1 and two dense layers with ReLu activation of size 64 and 32 respectably. The final layer is again a Softmax and has size three.  The learning rate for Adam is set to $1\times10^{-5}$.
 
 \begin{figure}[H]
   \begin{subfigure}[b]{0.35\textwidth}
     \includegraphics[width=\textwidth]{assets/roberta_model.png}
-    \caption{Architecture used for transformer models, with only a final Dense layer attached.}
+    \caption{Architecture used for transformer models, with only a final dense layer attached.}
     \label{fig:roberta_model}
   \end{subfigure}
   \hfill
@@ -364,7 +364,7 @@ For the word embedding model, we pretrained on 100,000 samples from the SNLI dat
 
 \subsection{Sentence Vector Model (LSTM)}
 The sentence vector model was tuned using the keras-tuner, and we tried various combinations of neurons and layers. The results are depicted in Figure~\ref{fig:lstm_hyperparameter_tuning}. Again we trained with the patience set to five, we show the full training graphs where the point marks the epoch with minimal validation loss to which the weights were restored. For the tuning phase, we trained 100,000 samples from the SNLI dataset~\cite{snli-bowman2015}, which we again used for pretraining. 
-In the end we choose the architecture depicted in Figure~\ref{fig:lstm_model} with the two non-trainable pre-initialized embedding layers as discussed in Section~\ref{sec:method_lstm}. Followed by two hidden layers for both the premise and the hypothesis with 32 neurons each. Then follows a concatenation and the LSTM layer with 65 units and a dropout of 0.1. After the LSTM there is a hidden layer with 128 neurons followed by the final layer. All Dense layers use the ReLu activation function except for the final layer which as with all other models uses Softmax and has three neurons. Again we train a model with and without pretraining and compare their performance during training in Figure~\ref{fig:lstm_model_train}. For this model, the pretrained version clearly outperformed the version without pretraining. The performance on the test set is listed in Table~\ref{tab:lstm_model_classification_report}. The model reaches a validation accuracy of 0.5 and a test accuracy of 0.5. The f1 score is high for label 0 (entailment) and 2 (contradiction) but low for label 1 (neutral). 
+In the end we choose the architecture depicted in Figure~\ref{fig:lstm_model} with the two non-trainable pre-initialized embedding layers as discussed in Section~\ref{sec:method_lstm}. Followed by two hidden layers for both the premise and the hypothesis with 32 neurons each. Then follows a concatenation and the LSTM layer with 65 units and a dropout of 0.1. After the LSTM there is a hidden layer with 128 neurons followed by the final layer. All dense layers use the ReLu activation function except for the final layer which as with all other models uses Softmax and has three neurons. Again we train a model with and without pretraining and compare their performance during training in Figure~\ref{fig:lstm_model_train}. For this model, the pretrained version clearly outperformed the version without pretraining. The performance on the test set is listed in Table~\ref{tab:lstm_model_classification_report}. The model reaches a validation accuracy of 0.5 and a test accuracy of 0.5. The f1 score is high for label 0 (entailment) and 2 (contradiction) but low for label 1 (neutral). 
 
 \begin{figure}[h!]
   \includegraphics[width=1\textwidth]{assets/lstm_hyper_parameter_tuning.jpg}
@@ -407,7 +407,7 @@ In the end we choose the architecture depicted in Figure~\ref{fig:lstm_model} wi
       0 (entailment)&0.46&0.55&0.50\\
       1 (neutral)&0.45&0.33&0.38\\
       2 (contradiction)&0.57&0.59&0.58\\ \hline
-      \multicolumn{3}{|c|}{accuracy} &\multicolumn{1}{c|}{0.5}\\
+      \multicolumn{3}{|c|}{accuracy} &\multicolumn{1}{c|}{0.50}\\
       \hline
       \end{tabular}}
       \newline
@@ -460,7 +460,7 @@ We started with BERT models. We used the \textit{bert-base-cased} as BERT model 
 \newpage
 \subsubsection{RoBERTa}
 Next we trained RoBERTa models. We used the standard RoBERTa model \textit{roberta-base} and the smaller \textit{distilroberta-base} as DistilRoBERTa. 
-Again we compare the training performance with and without pretraining on 100,000 samples of the SNLI datset~\cite{snli-bowman2015}. The results for the standard RoBERTa model and the distilled version are shown in Figure~\ref{fig:roberta_distilroberta_training}. In both versions, the pretrained version outperformed the non-pretrained version. The larger RoBERTa model with pretraining reached a validation accuracy of 0.8 the distilled version with pretraining reaches 0.74. As shown in Figure~\ref{fig:roberta_model_train} the minimal validation loss is reached after one epoch. %TODO: maybe rewrite and also train on actual data
+Again we compare the training performance with and without pretraining on 100,000 samples of the SNLI datset~\cite{snli-bowman2015}. The results for the standard RoBERTa model and the distilled version are shown in Figure~\ref{fig:roberta_distilroberta_training}. In both versions, the pretrained version outperformed the non-pretrained version. The larger RoBERTa model with pretraining reached a validation accuracy of 0.8 the distilled version with pretraining reaches 0.74. As shown in Figure~\ref{fig:roberta_model_train} and Figure~\ref{fig:distilled_roberta_model_train} the minimal validation loss for both models is reached after one epoch of training.
 
 \begin{figure}[H] 
   \begin{subfigure}[b]{0.4\linewidth}
@@ -531,7 +531,7 @@ After training different versions of BERT we compared their validation accuracy 
 
 \begin{figure}[H]
   \includegraphics[width=0.7\textwidth]{assets/bert_roberta_comparison.png}
-  \caption{Comparison of maximal validation accuracy reached during training for transformer models.}
+  \caption{Comparison of validation accuracy for transformer models.}
   \label{fig:transformer_comparison}
 \end{figure}
 
@@ -673,21 +673,22 @@ For all tested models, pretraining increased the achieved performance. However, 
 The more simple feature-based models delivered respectable performance and performed significantly better than the random guessing baseline based on the label distribution. They were able to detect entailment and contradiction specifically well with f1-scores around 0.5 for those labels. In contrast, the f1-score for the label neutral was more close to random guessing. 
 
 \subsection{Sentence Vector Model (LSTM)}
-The LSTM model, while performing slightly better when compared to the feature-based models, did not perform as well as we expected. We did not achieve the same accuracy on the SNLI pretraining data as the authors of SNLI~\cite{snli-bowman2015}, which used a similar architecture. However, we do believe this is due to the fact that the embedding vectors we used for our model are significantly smaller. Additionally, we did set them as non-trainable layers. This was done due to the high computational effort required to train the LSTM model. The fact that LSTM models cannot be parallelized to allow for efficient training on GPUs significantly increases the time needed to train them, which is why we had to use this simplified version of the model. 
+The LSTM model, while performing slightly better when compared to the feature-based models, did not perform as well as we expected. 
+However, as depicted in Figure~\ref{fig:lstm_model_pretrain} we did reach a similar validation accuracy as suggested by the authors of SNLI~\cite{snli-bowman2015} suggest, which was around 65\% for 100,000 training samples. Despite using significantly smaller embedding vectors of size 100, whereas the authors of SNLI used vectors of size 300~\cite{snli-bowman2015}. Additionally, we set our embedding vectors as non-trainable and instead introduced smaller dense layers that are trainable. These changes were done due to the high computational effort required to train the LSTM model. The fact that LSTM models cannot be parallelized to allow for efficient training on GPUs significantly increased the time needed to train them. Unfortunately, with 50\%, the training data's performance was considerably worse when compared to the pretraining data. The model could likely be improved by pretraining on the full pretraining data.
+
 
 \subsection{Transformer Models}
-When training the transformer models, all RoBERTa models outperformed their BERT counterparts by a significant margin, which is why we only focused on the RoBERTa models for our final evaluation. One type of model missing from our analysis is the large version of BERT, RoBERTa, and their multilingual variant. This was again done due to the computational resources which would be required to train these models. \\
-The best model in our testing was RoBERTa with which we achieve similar performance as suggested by the authors of RoBERTa~\cite{roberta-liu2019}. During pretraining we reach 87 percent validation accuracy on the pretraining data. 
-The accuracy achieved on the test data of the translated Kaggle dataset~\cite{kaggle-dataset} is lower, however still respectable with 83 percent accuracy. \\
+When training the transformer models, all RoBERTa models outperformed their BERT counterparts by a significant margin, which is why we only focused on the RoBERTa models for our final evaluation. One type of model missing from our analysis is the large version of BERT, RoBERTa, and their multilingual variant. This was done due to the computational resources which would be required to train these models.
+The best model in our testing was RoBERTa, with which we achieve a similar performance of 87\% on the pretraining data as suggested by the authors of RoBERTa~\cite{roberta-liu2019}. 
+The test accuracy achieved on the translated Kaggle dataset~\cite{kaggle-dataset} is lower, however still respectable with 83\%. \\
 When looking at the comparison of the final models depicted in Figure~\ref{fig:test_accuracy_vs_model_size} we can see that the smaller distilled version of RoBERTa outperforms the significantly bigger multilingual ml-RoBERTa. Of course, the latter does not require translation before using the model. 
-However, working with translated data might be a viable option. As Figure~\ref{fig:test_accuracy_english_vs_non_english} illustrates, the performance on translated data, while worse than the performance of data already available in English, is quite good. And the accuracy of the multilingual model on non-English data is significantly worse. One way this could be improved is by pretraining the multilingual model with non-English data. However, finding multilingual datasets is challenging. Another option would be to translate English samples to other languages and use them as pretraining samples. Which we leave as future work.
+However, working with translated data might be a viable option. As Figure~\ref{fig:test_accuracy_english_vs_non_english} illustrates, the performance on translated data, while worse than the performance of data already available in English, is quite good. And the accuracy of the multilingual model on non-English data is significantly worse. One way the latter could be improved is by pretraining the multilingual model with non-English data. However, finding multilingual datasets is challenging. Another option would be to translate English samples to other languages and use them as pretraining samples, which we leave as future work.
 
-%TODO: compare with similar work
 
 \section{Conclusion}
 % Based on results and analysis what knowledge do you take away from your project?
-By using transformer models, we were able to create models that achieve competitive scores for the task of natural language inference on our dataset. We were not able to create an LSTM model that offered comparative performance in part because LSTM models cannot be efficiently trained on GPUs. The distilled version of RoBERTa achieved similar performance to the standard RoBERTa model while being significantly smaller and similar in size to the LSTM model. 
-The multilingual version of RoBERTa has the benefit of being able to work with data from different languages. However, the performance was worse compared to the models working with translated data. Therefore depending on the use-case, it might be better to translate non-English data in a pre-processing step and to use an English-only model, for example, in a scenario where multiple classification tasks need to be applied to text data. The input can be translated once and can then be used as input for various English-only models. The alternative would be to create multiple multilingual models, which would need to be significantly bigger in size.  
+By using transformers, we were able to create models that achieve competitive scores for the task of natural language inference on our dataset. We were not able to create an LSTM model that offered comparative performance in part because LSTM models cannot be efficiently trained on GPUs. The distilled version of RoBERTa achieved similar performance to the standard RoBERTa model while being significantly smaller and similar in size to the LSTM model. 
+The multilingual version of RoBERTa has the benefit of being able to work with data from different languages. However, the performance was worse compared to the models working with translated data. Therefore depending on the use-case, it might be better to translate non-English data in a pre-processing step and to use an English-only model, for example, in a scenario where multiple classification tasks need to be applied to text data. The input can be translated once and can then be used as input for various smaller English-only models.
 
 
 \pagebreak  

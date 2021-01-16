@@ -1,0 +1,1 @@
+{"separate_hidden_layer_neurons": 128, "separate_hidden_layer_num_layers": 2, "concat_hidden_layer_neurons": 512, "concat_hidden_layer_num_layers": 2}

@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-DATA_DIR = "D:/text_mining_project_logs/"
+DATA_DIR = "logs/"
 
 embedded_classifier_model_name = 'embedded_classifier'
 embedded_classifier_pretrain = "2020-12-29_15_translated_with_pretrain"

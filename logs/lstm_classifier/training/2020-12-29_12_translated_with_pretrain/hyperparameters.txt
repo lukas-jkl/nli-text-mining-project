@@ -1,0 +1,1 @@
+{"lstm_units": 65, "lstm_dropout": 0.1, "concat_hidden_layer_num_layers": 0, "concat_hidden_layer_neurons": 128, "separate_hidden_layer_num_layers": 2, "separate_hidden_layer_neurons": 32, "final_hidden_layer_num_layers": 1, "final_hidden_layer_neurons": 128}

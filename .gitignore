@@ -1,8 +1,17 @@
 .idea/
 
-logs/
+
 cache/
 venv/
+
+# Ignore generated images and logs from tensorboard
+logs/**/tensorboard_logs
+logs/**/*.png
+# Ignore files that are to big
+logs/**/final_weights
+logs/**/model_checkpoints
+logs/**/final_model
+logs/**/colab0
 
 
 ### Python ###
